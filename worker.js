@@ -14,7 +14,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-// Pre-allocate 10MB buffer for download tests to save CPU cycles
+// Pre-allocate 10MB buffer for download tests
 const CHUNK_SIZE = 10 * 1024 * 1024;
 const BUFFER = new Uint8Array(CHUNK_SIZE);
 for (let i = 0; i < CHUNK_SIZE; i++) BUFFER[i] = i % 256;
@@ -29,7 +29,7 @@ export default {
       return new Response(html, {
         headers: {
           'Content-Type': 'text/html;charset=UTF-8',
-          'Cache-Control': 'no-cache', // Ensure latest UI is always loaded
+          'Cache-Control': 'no-cache', 
           ...CORS_HEADERS
         },
       });
@@ -107,14 +107,19 @@ export default {
     }
 
     // 6. API: Metadata
+    // FIX: Use request.cf object instead of headers for reliable metadata
     if (path === '/api/meta') {
+      const cf = request.cf || {};
+      
       return new Response(JSON.stringify({
         ip: request.headers.get('cf-connecting-ip') || 'Unknown',
-        city: request.headers.get('cf-ipcity') || 'Unknown',
-        country: request.headers.get('cf-ipcountry') || 'Unknown',
-        asn: request.headers.get('cf-ipasn') || '',
-        isp: request.headers.get('cf-ipasn-org') || 'Unknown ISP',
-        colo: request.cf?.colo || 'Edge'
+        // Fallback chain: CF City -> CF Region -> Unknown
+        city: cf.city || 'Unknown City',
+        region: cf.region || cf.regionCode || '', 
+        country: cf.country || 'XX',
+        asn: cf.asn || 'AS---',
+        isp: cf.asOrganization || 'Unknown ISP',
+        colo: cf.colo || 'Edge'
       }), {
          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
       });
