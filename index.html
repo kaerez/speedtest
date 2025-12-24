@@ -154,7 +154,7 @@ kaerez/speedtest/index.html
                     .then(r => r.json())
                     .then(m => { 
                         setData(d => ({...d, meta: m})); 
-                        log(`CONNECTED: ${m.isp} (${m.ip})`); 
+                        // Initial "CONNECTED" log removed per user request
                     })
                     .catch(e => { console.error(e); log('ERROR: FAILED TO FETCH METADATA'); });
                 setTimeout(() => lucide.createIcons(), 100);
@@ -171,8 +171,9 @@ kaerez/speedtest/index.html
             const runTest = async () => {
                 if(status === 'RUNNING') return;
                 setStatus('RUNNING');
+                // Reset metrics but keep meta
                 setData(d => ({...d, down: 0, up: 0, ping: 0, jitter: 0, loss: 0}));
-                setLogs([]); 
+                // setLogs([]) removed to preserve history
                 log('TEST INITIATED...');
 
                 try {
@@ -234,9 +235,14 @@ kaerez/speedtest/index.html
                     log('TEST COMPLETE');
                     log('--------------------------------');
                     log(`RESULTS FOR ${data.meta.ip}`);
-                    log(`DOWN: ${((dlBytes * 8) / (dlDuration/1000 * 1000 * 1000)).toFixed(2)} Mbps`);
-                    log(`UP:   ${((ulBytes * 8) / (ulDuration/1000 * 1000 * 1000)).toFixed(2)} Mbps`);
-                    log(`PING: ${minPing.toFixed(0)} ms`);
+                    log(`PROVIDER: ${data.meta.isp} (AS${data.meta.asn})`);
+                    log(`LOCATION: ${getLocationDisplay()}, ${data.meta.country}`);
+                    log(`SERVER:   ${data.meta.colo} (${getColoRegion(data.meta.colo)})`);
+                    log(`DOWN:     ${((dlBytes * 8) / (dlDuration/1000 * 1000 * 1000)).toFixed(2)} Mbps`);
+                    log(`UP:       ${((ulBytes * 8) / (ulDuration/1000 * 1000 * 1000)).toFixed(2)} Mbps`);
+                    log(`PING:     ${minPing.toFixed(0)} ms`);
+                    log(`JITTER:   ${jitter.toFixed(0)} ms`);
+                    log(`LOSS:     ${loss.toFixed(1)}%`);
                     log('--------------------------------');
 
                 } catch (err) {
@@ -263,7 +269,9 @@ kaerez/speedtest/index.html
                                 {getFlag(data.meta.country)} {data.meta.country}
                              </div>
                              <div className="flex flex-col items-end">
-                                 <div className="text-xs font-mono text-slate-500 font-bold">{data.meta.ip}</div>
+                                 <a href={`https://radar.cloudflare.com/ip/${data.meta.ip}`} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-slate-500 font-bold hover:text-emerald-600 hover:underline transition-colors">
+                                    {data.meta.ip}
+                                 </a>
                                  <div className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">{getIpVersion(data.meta.ip)}</div>
                              </div>
                         </div>
@@ -286,7 +294,11 @@ kaerez/speedtest/index.html
                             icon={<i data-lucide="network" className="w-4 h-4 text-emerald-600"></i>}
                             label="Provider"
                             value={data.meta.isp}
-                            subValue={`ASN: AS${data.meta.asn}`} 
+                            subValue={
+                                <span className="flex items-center gap-1">
+                                    ASN: <a href={`https://radar.cloudflare.com/as${data.meta.asn}`} target="_blank" rel="noopener noreferrer" className="hover:text-emerald-600 hover:underline">AS{data.meta.asn}</a>
+                                </span>
+                            } 
                         />
                          <StatBox 
                             icon={<i data-lucide="map-pin" className="w-4 h-4 text-emerald-600"></i>}
@@ -319,7 +331,7 @@ kaerez/speedtest/index.html
                         <div className="md:col-span-2 tech-border bg-slate-50 p-3 font-mono text-xs flex flex-col justify-end h-48 rounded-sm border-slate-200 overflow-hidden">
                             <div className="overflow-y-auto flex flex-col-reverse h-full scrollbar-thin scrollbar-thumb-slate-200">
                                 {logs.map((l, i) => (
-                                    <div key={i} className="text-slate-600 mb-1 border-l-2 border-transparent pl-2 hover:border-emerald-300 transition-colors shrink-0">
+                                    <div key={i} className="text-slate-600 mb-1 border-l-2 border-transparent pl-2 hover:border-emerald-300 transition-colors shrink-0 whitespace-pre-wrap">
                                         {l}
                                     </div>
                                 )).reverse()}
