@@ -14,6 +14,15 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
+// Security Headers (New)
+const SECURITY_HEADERS = {
+    'X-Frame-Options': 'DENY',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+    'X-XSS-Protection': '1; mode=block'
+};
+
 // Security Constants
 const AUTH_COOKIE_NAME = 'KSEC_AUTH';
 const CHUNK_SIZE = 10 * 1024 * 1024;
@@ -117,7 +126,8 @@ export default {
         headers: {
           'Content-Type': 'text/html;charset=UTF-8',
           'Cache-Control': 'no-cache', 
-          ...CORS_HEADERS
+          ...CORS_HEADERS,
+          ...SECURITY_HEADERS // Added Security Headers
         },
       });
     }
