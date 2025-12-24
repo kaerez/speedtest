@@ -5,7 +5,7 @@
 # * Repo: kaerez/speedtest
 # * License: PolyForm Noncommercial 1.0.0 (Requires CLA)
 
-name = "ksec-speedtest"
+name = "speedtest"
 main = "worker.js"
 compatibility_date = "2024-12-24"
 
