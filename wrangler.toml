@@ -9,9 +9,10 @@ name = "speedtest"
 main = "worker.js"
 compatibility_date = "2024-12-24"
 
+# Only bundle HTML files now
 [[rules]]
 type = "Text"
-globs = ["*.html", "client.js"]
+globs = ["*.html"]
 fallthrough = false
 
 [observability]
