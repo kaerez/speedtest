@@ -1,17 +1,12 @@
 // ============================================
 // kaerez/speedtest/worker.js
 // ============================================
+// * Author: Erez Kalman - KSEC
+// * Repo: kaerez/speedtest
+// * License: PolyForm Noncommercial 1.0.0 (Requires CLA)
 
-/**
- * KSEC SPEED TEST - Backend Logic
- * Author: Erez Kalman - KSEC
- * Repo: kaerez/speedtest
- * License: PolyForm Noncommercial 1.0.0 (Requires CLA)
- */
-
-// Import frontend assets as raw text modules (handled by wrangler.toml rules)
+// Import frontend assets as raw text modules
 import html from './index.html';
-import clientScript from './client.js';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -40,23 +35,12 @@ export default {
       });
     }
 
-    // 2. Serve Frontend Logic (Client JS)
-    if (path === '/client.js') {
-      return new Response(clientScript, {
-        headers: {
-          'Content-Type': 'application/javascript;charset=UTF-8',
-          'Cache-Control': 'no-cache',
-          ...CORS_HEADERS
-        },
-      });
-    }
-
-    // 3. API Preflight
+    // 2. API Preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: CORS_HEADERS });
     }
 
-    // 4. API: Ping (Latency)
+    // 3. API: Ping (Latency)
     if (path === '/api/ping') {
       return new Response('pong', {
         headers: { 
@@ -67,7 +51,7 @@ export default {
       });
     }
 
-    // 5. API: Download Stream
+    // 4. API: Download Stream
     if (path === '/api/down') {
       const bytes = Math.min(parseInt(url.searchParams.get('bytes') || '50000000'), 100000000);
       const { readable, writable } = new TransformStream();
@@ -97,7 +81,7 @@ export default {
       });
     }
 
-    // 6. API: Upload Stream
+    // 5. API: Upload Stream
     if (path === '/api/up' && request.method === 'POST') {
       const startTime = Date.now();
       const reader = request.body.getReader();
@@ -122,7 +106,7 @@ export default {
       });
     }
 
-    // 7. API: Metadata
+    // 6. API: Metadata
     if (path === '/api/meta') {
       return new Response(JSON.stringify({
         ip: request.headers.get('cf-connecting-ip') || 'Unknown',
