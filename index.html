@@ -13,7 +13,7 @@ kaerez/speedtest/index.html
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="author" content="Erez Kalman - KSEC">
     
-    <!-- Security: Meta Tags for caching and basic framing protection -->
+    <!-- Security: Meta Tags -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -44,14 +44,12 @@ kaerez/speedtest/index.html
         }
         .mono { font-family: 'JetBrains Mono', monospace; }
         
-        /* Clean Technical Borders */
         .tech-border { 
             background: white;
             border: 1px solid var(--border);
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
             position: relative; 
         }
-        /* Corner Accents */
         .tech-border::after { 
             content: ''; position: absolute; top: -1px; left: -1px; width: 12px; height: 12px; 
             border-top: 2px solid var(--accent); border-left: 2px solid var(--accent); 
@@ -61,7 +59,6 @@ kaerez/speedtest/index.html
             border-bottom: 2px solid var(--accent); border-right: 2px solid var(--accent); 
         }
         
-        /* Background Grid (Subtle) */
         .bg-grid { 
             background-size: 40px 40px; 
             background-image: linear-gradient(to right, #00000005 1px, transparent 1px), 
@@ -75,19 +72,13 @@ kaerez/speedtest/index.html
     <script type="text/babel">
         // Security: Frame Buster
         if (window.self !== window.top) {
-            try {
-                window.top.location = window.self.location;
-            } catch (e) {
-                // If blocked by sandbox, overwrite body content
-                document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;background:white;color:red;font-weight:bold;">Embedding not permitted.</div>';
-            }
+            try { window.top.location = window.self.location; } 
+            catch (e) { document.body.innerHTML = 'Embedding not permitted.'; }
         }
 
         const { useState, useEffect, useRef } = React;
 
-        // --- Constants & Maps ---
-        
-        // Partial map of Cloudflare Colos to City/Region
+        // Constants & Maps
         const COLO_MAP = {
             'LHR': 'London, UK', 'MAN': 'Manchester, UK', 'AMS': 'Amsterdam, NL', 'FRA': 'Frankfurt, DE',
             'CDG': 'Paris, FR', 'IAD': 'Ashburn, VA, US', 'SJC': 'San Jose, CA, US', 'LAX': 'Los Angeles, CA, US',
@@ -99,15 +90,9 @@ kaerez/speedtest/index.html
         };
 
         const getColoRegion = (code) => COLO_MAP[code] || 'Unknown Region';
-
         const getIpVersion = (ip) => ip.includes(':') ? 'IPv6' : 'IPv4';
+        const getTimestamp = () => new Date().toISOString().replace('T', ' ').split('.')[0] + ' UTC';
 
-        const getTimestamp = () => {
-            const now = new Date();
-            return now.toISOString().replace('T', ' ').split('.')[0] + ' UTC';
-        };
-
-        // --- Helper: Get Flag Emoji from Country Code ---
         const getFlag = (cc) => {
             if (!cc || cc === 'XX') return '🌐';
             return cc.toUpperCase().replace(/./g, char => 
@@ -115,12 +100,11 @@ kaerez/speedtest/index.html
             );
         }
 
-        // --- UI Component: Circular Gauge ---
+        // --- UI Component: Gauge ---
         const Gauge = ({ value, label, unit, color }) => {
             const r = 70, c = 2 * Math.PI * r, max = 1000;
             const off = c - (Math.min(value, max) / max) * c;
-            // Map simple color names to Tailwind Hex for White Theme
-            const strokeColor = color === 'cyan' ? '#0891b2' : '#059669'; // cyan-600 : emerald-600
+            const strokeColor = color === 'cyan' ? '#0891b2' : '#059669';
 
             return (
                 <div className="tech-border p-6 flex flex-col items-center justify-center w-full rounded-sm">
@@ -157,20 +141,12 @@ kaerez/speedtest/index.html
         const App = () => {
             const [status, setStatus] = useState('IDLE');
             const [data, setData] = useState({ 
-                ping: 0, 
-                jitter: 0, 
-                loss: 0, 
-                down: 0, 
-                up: 0, 
-                meta: { ip: '---', isp: 'Loading...', country: 'XX', asn: '---', city: '---', colo: '---' } 
+                ping: 0, jitter: 0, loss: 0, down: 0, up: 0, 
+                meta: { ip: '---', isp: 'Loading...', country: 'XX', asn: '---', city: '---', region: '', colo: '---' } 
             });
             const [logs, setLogs] = useState([]);
             
-            // Add initial log once
-            useEffect(() => {
-                log('SYSTEM READY');
-            }, []);
-
+            useEffect(() => { log('SYSTEM READY'); }, []);
             const log = (m) => setLogs(p => [...p, `[${getTimestamp()}] > ${m}`]);
 
             useEffect(() => {
@@ -180,19 +156,23 @@ kaerez/speedtest/index.html
                         setData(d => ({...d, meta: m})); 
                         log(`CONNECTED: ${m.isp} (${m.ip})`); 
                     })
-                    .catch(e => {
-                        console.error(e);
-                        log('ERROR: FAILED TO FETCH METADATA');
-                    });
+                    .catch(e => { console.error(e); log('ERROR: FAILED TO FETCH METADATA'); });
                 setTimeout(() => lucide.createIcons(), 100);
             }, []);
+
+            // Helper to determine best location string
+            const getLocationDisplay = () => {
+                const { city, region } = data.meta;
+                if (city && city !== 'Unknown City') return city;
+                if (region) return region;
+                return 'Unknown Location';
+            };
 
             const runTest = async () => {
                 if(status === 'RUNNING') return;
                 setStatus('RUNNING');
-                // Reset metrics but keep meta
                 setData(d => ({...d, down: 0, up: 0, ping: 0, jitter: 0, loss: 0}));
-                setLogs([]); // Clear previous logs for new test run
+                setLogs([]); 
                 log('TEST INITIATED...');
 
                 try {
@@ -200,31 +180,25 @@ kaerez/speedtest/index.html
                     log('MEASURING LATENCY & LOSS...');
                     let pings = [];
                     let failedPings = 0;
-                    const totalPings = 10; 
-                    
-                    for(let i=0; i<totalPings; i++) {
+                    for(let i=0; i<10; i++) {
                         const s = performance.now();
                         try {
                             const res = await fetch('/api/ping');
                             if (!res.ok) throw new Error('Ping failed');
                             pings.push(performance.now() - s);
-                        } catch (e) {
-                            failedPings++;
-                        }
+                        } catch (e) { failedPings++; }
                     }
                     
-                    // Calculations
-                    const loss = (failedPings / totalPings) * 100;
+                    const loss = (failedPings / 10) * 100;
                     const minPing = pings.length > 0 ? Math.min(...pings) : 0;
                     const jitter = pings.length > 1 ? Math.abs(pings[0] - pings[pings.length-1]) : 0;
-                    
                     setData(d => ({...d, ping: minPing, jitter, loss}));
 
                     // 2. DOWNLOAD
                     log('DOWNLOADING...');
                     const dlStart = performance.now();
                     let dlBytes = 0;
-                    const dlDuration = 10000; // 10s
+                    const dlDuration = 10000;
                     
                     while(performance.now() - dlStart < dlDuration) {
                         try {
@@ -237,16 +211,14 @@ kaerez/speedtest/index.html
                                 const elapsed = (performance.now() - dlStart) / 1000;
                                 if (elapsed > 0) setData(d => ({...d, down: (dlBytes * 8) / (elapsed * 1000 * 1000)}));
                             }
-                        } catch (e) {
-                            // Ignore stream errors during test
-                        }
+                        } catch (e) {}
                     }
 
                     // 3. UPLOAD
                     log('UPLOADING...');
                     const ulStart = performance.now();
                     let ulBytes = 0;
-                    const ulDuration = 10000; // 10s
+                    const ulDuration = 10000;
                     const chunk = new Uint8Array(1024 * 1024); 
                     
                     while(performance.now() - ulStart < ulDuration) {
@@ -255,22 +227,16 @@ kaerez/speedtest/index.html
                             ulBytes += chunk.length;
                             const elapsed = (performance.now() - ulStart) / 1000;
                             if (elapsed > 0) setData(d => ({...d, up: (ulBytes * 8) / (elapsed * 1000 * 1000)}));
-                        } catch (e) {
-                           // Ignore upload errors
-                        }
+                        } catch (e) {}
                     }
 
                     setStatus('COMPLETE');
                     log('TEST COMPLETE');
-                    
-                    // Log Final Results Summary
                     log('--------------------------------');
                     log(`RESULTS FOR ${data.meta.ip}`);
                     log(`DOWN: ${((dlBytes * 8) / (dlDuration/1000 * 1000 * 1000)).toFixed(2)} Mbps`);
                     log(`UP:   ${((ulBytes * 8) / (ulDuration/1000 * 1000 * 1000)).toFixed(2)} Mbps`);
                     log(`PING: ${minPing.toFixed(0)} ms`);
-                    log(`JITTER: ${jitter.toFixed(0)} ms`);
-                    log(`LOSS: ${loss.toFixed(1)}%`);
                     log('--------------------------------');
 
                 } catch (err) {
@@ -283,7 +249,6 @@ kaerez/speedtest/index.html
             return (
                 <div className="flex flex-col items-center justify-center min-h-screen p-4 max-w-6xl mx-auto w-full">
                     
-                    {/* Header */}
                     <header className="w-full border-b border-slate-200 pb-4 mb-8 flex justify-between items-end">
                         <div>
                             <h1 className="text-4xl font-bold text-slate-800 tracking-tighter">
@@ -304,13 +269,11 @@ kaerez/speedtest/index.html
                         </div>
                     </header>
 
-                    {/* Gauges */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mb-6">
                         <Gauge value={data.down} label="Download Speed" unit="Mbps" color="cyan" />
                         <Gauge value={data.up} label="Upload Speed" unit="Mbps" color="emerald" />
                     </div>
 
-                    {/* Network Intelligence Grid */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full mb-6">
                         <StatBox 
                             icon={<i data-lucide="activity" className="w-4 h-4 text-emerald-600"></i>}
@@ -323,12 +286,12 @@ kaerez/speedtest/index.html
                             icon={<i data-lucide="network" className="w-4 h-4 text-emerald-600"></i>}
                             label="Provider"
                             value={data.meta.isp}
-                            subValue={`ASN: ${data.meta.asn}`} // Fixed display to use raw ASN from worker (check formatting)
+                            subValue={`ASN: AS${data.meta.asn}`} 
                         />
                          <StatBox 
                             icon={<i data-lucide="map-pin" className="w-4 h-4 text-emerald-600"></i>}
                             label="Location"
-                            value={data.meta.city}
+                            value={getLocationDisplay()}
                             subValue={`${getFlag(data.meta.country)} ${data.meta.country}`}
                         />
                          <StatBox 
@@ -339,7 +302,6 @@ kaerez/speedtest/index.html
                         />
                     </div>
 
-                    {/* Controls */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
                         <button 
                             onClick={runTest} 
@@ -365,7 +327,6 @@ kaerez/speedtest/index.html
                         </div>
                     </div>
                     
-                    {/* Footer - Updated Link */}
                     <footer className="mt-12 text-center text-xs text-slate-400 uppercase tracking-widest hover:text-emerald-600 transition-colors">
                         <a href="https://github.com/kaerez/speedtest/" target="_blank" rel="noopener noreferrer">
                             GitHub Repository & Licensing
