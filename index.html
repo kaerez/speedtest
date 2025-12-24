@@ -100,6 +100,13 @@ kaerez/speedtest/index.html
             );
         }
 
+        // --- Custom Icons ---
+        const ExternalIcon = () => (
+            <svg width="1.25em" height="1.25em" viewBox="0 0 33 24" fill="currentColor" className="inline-block ml-1 align-text-bottom text-slate-400 hover:text-blue-600 transition-colors">
+                <path d="m23 0 1 1v5.56h-2V2H2v20h20v-4.55h2V23l-1 1H1l-1-1V1l1-1zm4.47 6.56-1.4 1.42L29.13 11H12.01v2h17.12l-3.06 3.02 1.4 1.42L33 12z"></path>
+            </svg>
+        );
+
         // --- UI Component: Gauge ---
         const Gauge = ({ value, label, unit, color }) => {
             const r = 70, c = 2 * Math.PI * r, max = 1000;
@@ -154,7 +161,6 @@ kaerez/speedtest/index.html
                     .then(r => r.json())
                     .then(m => { 
                         setData(d => ({...d, meta: m})); 
-                        // Initial "CONNECTED" log removed per user request
                     })
                     .catch(e => { console.error(e); log('ERROR: FAILED TO FETCH METADATA'); });
                 setTimeout(() => lucide.createIcons(), 100);
@@ -171,9 +177,7 @@ kaerez/speedtest/index.html
             const runTest = async () => {
                 if(status === 'RUNNING') return;
                 setStatus('RUNNING');
-                // Reset metrics but keep meta
                 setData(d => ({...d, down: 0, up: 0, ping: 0, jitter: 0, loss: 0}));
-                // setLogs([]) removed to preserve history
                 log('TEST INITIATED...');
 
                 try {
@@ -269,8 +273,9 @@ kaerez/speedtest/index.html
                                 {getFlag(data.meta.country)} {data.meta.country}
                              </div>
                              <div className="flex flex-col items-end">
-                                 <a href={`https://radar.cloudflare.com/ip/${data.meta.ip}`} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-slate-500 font-bold hover:text-emerald-600 hover:underline transition-colors">
+                                 <a href={`https://radar.cloudflare.com/ip/${data.meta.ip}`} target="_blank" rel="noreferrer" className="flex items-center text-xs font-mono text-slate-500 font-bold text-blue-600 underline hover:text-blue-800 transition-colors">
                                     {data.meta.ip}
+                                    <ExternalIcon />
                                  </a>
                                  <div className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">{getIpVersion(data.meta.ip)}</div>
                              </div>
@@ -296,7 +301,10 @@ kaerez/speedtest/index.html
                             value={data.meta.isp}
                             subValue={
                                 <span className="flex items-center gap-1">
-                                    ASN: <a href={`https://radar.cloudflare.com/as${data.meta.asn}`} target="_blank" rel="noopener noreferrer" className="hover:text-emerald-600 hover:underline">AS{data.meta.asn}</a>
+                                    ASN: <a href={`https://radar.cloudflare.com/as${data.meta.asn}`} target="_blank" rel="noreferrer" className="flex items-center text-blue-600 underline hover:text-blue-800">
+                                        AS{data.meta.asn}
+                                        <ExternalIcon />
+                                    </a>
                                 </span>
                             } 
                         />
@@ -314,7 +322,7 @@ kaerez/speedtest/index.html
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mb-8">
                         <button 
                             onClick={runTest} 
                             disabled={status === 'RUNNING'} 
@@ -338,8 +346,20 @@ kaerez/speedtest/index.html
                             </div>
                         </div>
                     </div>
+
+                    {/* BGP Safety Section */}
+                    <div className="w-full tech-border bg-white p-4 mb-8 flex items-center justify-between rounded-sm">
+                        <div>
+                            <h3 className="text-lg font-bold text-slate-800">Is BGP safe yet?</h3>
+                            <p className="text-xs text-slate-500">Check if your ISP is implementing BGP safely with RPKI</p>
+                        </div>
+                        <a href="https://isbgpsafeyet.com/" target="_blank" rel="noreferrer" className="flex items-center text-sm font-bold text-blue-600 underline hover:text-blue-800">
+                            isbgpsafeyet.com
+                            <ExternalIcon />
+                        </a>
+                    </div>
                     
-                    <footer className="mt-12 text-center text-xs text-slate-400 uppercase tracking-widest hover:text-emerald-600 transition-colors">
+                    <footer className="mt-8 text-center text-xs text-slate-400 uppercase tracking-widest hover:text-emerald-600 transition-colors">
                         <a href="https://github.com/kaerez/speedtest/" target="_blank" rel="noopener noreferrer">
                             GitHub Repository & Licensing
                         </a>
