@@ -48,10 +48,12 @@ export default {
       try {
         const { token } = await request.json();
 
-        // Validate with CapJS
         const capRes = await fetch(CAPTCHA_VALIDATE_API, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Origin': url.origin
+          },
           body: JSON.stringify({ token })
         });
         if (capRes.ok) {
