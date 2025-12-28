@@ -25,8 +25,8 @@ const SECURITY_HEADERS = {
 
 // Security Constants
 const AUTH_COOKIE_NAME = 'KSEC_AUTH';
-// 90 seconds expiration
-const COOKIE_TTL_MS = 90 * 1000;
+// 10 minutes expiration
+const COOKIE_TTL_MS = 10 * 60 * 1000;
 
 // In-Memory Session Storage (UUID -> Expiration Timestamp)
 // WARNING: This is ephemeral and local to the Worker isolate.
@@ -77,7 +77,7 @@ export default {
             return new Response('{"success": true}', {
               headers: {
                 'Content-Type': 'application/json',
-                'Set-Cookie': `${AUTH_COOKIE_NAME}=${sessionId}; HttpOnly; Secure; SameSite=Strict; Max-Age=90; Path=/`
+                'Set-Cookie': `${AUTH_COOKIE_NAME}=${sessionId}; HttpOnly; Secure; SameSite=Strict; Max-Age=600; Path=/`
               }
             });
           } else {
@@ -168,43 +168,11 @@ export default {
           `<script>window.SPEEDTEST_CONFIG = ${JSON.stringify(config)};</script>`
         );
 
-        // Frame Headers - Dynamic Allowance
-        let frameHeaders = {
+        // Frame Headers - Strict Security (No Embedding)
+        const frameHeaders = {
           'X-Frame-Options': 'DENY',
           'Content-Security-Policy': "frame-ancestors 'none'"
         };
-
-        const referer = request.headers.get('Referer');
-        if (referer) {
-          try {
-            const refUrl = new URL(referer);
-            const refString = refUrl.host + refUrl.pathname;
-
-            // Robust parsing: Handle quotes, whitespace, and empty entries
-            const allowedList = (env.ALLOWED_IFRAMES || '').split(',')
-              .map(s => s.trim().replace(/^["']+|["']+$/g, ''))
-              .filter(Boolean);
-
-            // Implicitly allow Self (Worker's own domain)
-            allowedList.push(url.host);
-
-            let matched = false;
-            for (const rule of allowedList) {
-              const regexBody = rule.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-              const regex = new RegExp(`^${regexBody}$`);
-              if (regex.test(refUrl.host) || regex.test(refString)) {
-                matched = true;
-                break;
-              }
-            }
-            if (matched) {
-              frameHeaders = {
-                'X-Frame-Options': `ALLOW-FROM ${refUrl.origin}`,
-                'Content-Security-Policy': `frame-ancestors ${refUrl.origin}`
-              };
-            }
-          } catch (e) { }
-        }
 
         return new Response(modifiedHtml, {
           headers: {

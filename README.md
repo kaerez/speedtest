@@ -8,7 +8,7 @@ A high-performance, privacy-focused network speed test application built on **Cl
 -   **No Client-Side Bloat**: Single file React application served directly from the Worker.
 -   **Accurate Metrics**: Measures Download, Upload, Latency (Ping), Jitter, and Packet Loss.
 -   **Privacy Focused**: No third-party tracking. Metadata (IP, ISP) is only fetched after verification.
--   **Bot Protection (Optional)**: Integrated [CapJS](https://cap.js.org/) to prevent automated abuse of bandwidth.
+-   **Bot Protection (Optional)**: Integrated [CapJS](https://github.com/kaerez/CFCap) to prevent automated abuse of bandwidth.
 
 ## Architecture
 
@@ -26,7 +26,7 @@ The application is configured via `wrangler.toml` and Environment Variables.
 | :--- | :--- | :--- |
 | `SPEEDTEST_REQUIRE_AUTH` | Set to `"false"` to disable CapJS verification and allow immediate testing. | `"true"` |
 | `CAPTCHA_API_URL` | Optional full URL to a custom CapJS validation API. If set, Workers proxies challenge/redeem endpoints here. | `undefined` |
-| `ALLOWED_IFRAMES` | Comma-separated list of allowed parent origins or paths (e.g., `a.com,*.b.com,*.c.com/app/*`). | `undefined` (Deny All) |
+
 
 ### Service Bindings
 
@@ -101,23 +101,7 @@ The Worker automatically handles URL normalization:
 CAPTCHA_API_URL = "https://cap.example.com/api"
 ```
 
-### Iframe Protection
 
-To allow embedding this Speed Test in an iframe, set `ALLOWED_IFRAMES`:
-
-```bash
-# Example: Allow specific domain and a wildcard path
-npx wrangler secret put ALLOWED_IFRAMES
-# Value: "my-portal.com,*.partners.com/dashboard/*"
-```
-
-The Worker checks the `Referer` header of the request:
--   **Match**: Sets `X-Frame-Options: ALLOW-FROM ...` and `Content-Security-Policy: frame-ancestors ...`.
--   **No Match**: Sets `DENY` and `frame-ancestors 'none'`.
--   **Rules**: 
-    -   `a.com` matches exact host.
-    -   `*.a.com` matches usage as wildcard prefix.
-    -   `*/path/*` matches against host+path.
 
 ## License
 
