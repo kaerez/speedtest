@@ -168,36 +168,42 @@ export default {
           `<script>window.SPEEDTEST_CONFIG = ${JSON.stringify(config)};</script>`
         );
 
-        // Frame Headers
+        // Frame Headers - Dynamic Allowance
         let frameHeaders = {
           'X-Frame-Options': 'DENY',
           'Content-Security-Policy': "frame-ancestors 'none'"
         };
 
-        if (env.ALLOWED_IFRAMES) {
-          const referer = request.headers.get('Referer');
-          if (referer) {
-            try {
-              const refUrl = new URL(referer);
-              const refString = refUrl.host + refUrl.pathname;
-              const allowedList = env.ALLOWED_IFRAMES.split(',').map(s => s.trim().replace(/^["']|["']$/g, ''));
-              let matched = false;
-              for (const rule of allowedList) {
-                const regexBody = rule.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-                const regex = new RegExp(`^${regexBody}$`);
-                if (regex.test(refUrl.host) || regex.test(refString)) {
-                  matched = true;
-                  break;
-                }
+        const referer = request.headers.get('Referer');
+        if (referer) {
+          try {
+            const refUrl = new URL(referer);
+            const refString = refUrl.host + refUrl.pathname;
+
+            // Robust parsing: Handle quotes, whitespace, and empty entries
+            const allowedList = (env.ALLOWED_IFRAMES || '').split(',')
+              .map(s => s.trim().replace(/^["']+|["']+$/g, ''))
+              .filter(Boolean);
+
+            // Implicitly allow Self (Worker's own domain)
+            allowedList.push(url.host);
+
+            let matched = false;
+            for (const rule of allowedList) {
+              const regexBody = rule.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+              const regex = new RegExp(`^${regexBody}$`);
+              if (regex.test(refUrl.host) || regex.test(refString)) {
+                matched = true;
+                break;
               }
-              if (matched) {
-                frameHeaders = {
-                  'X-Frame-Options': `ALLOW-FROM ${refUrl.origin}`,
-                  'Content-Security-Policy': `frame-ancestors ${refUrl.origin}`
-                };
-              }
-            } catch (e) { }
-          }
+            }
+            if (matched) {
+              frameHeaders = {
+                'X-Frame-Options': `ALLOW-FROM ${refUrl.origin}`,
+                'Content-Security-Policy': `frame-ancestors ${refUrl.origin}`
+              };
+            }
+          } catch (e) { }
         }
 
         return new Response(modifiedHtml, {

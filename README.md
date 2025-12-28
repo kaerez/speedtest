@@ -26,7 +26,7 @@ The application is configured via `wrangler.toml` and Environment Variables.
 | :--- | :--- | :--- |
 | `SPEEDTEST_REQUIRE_AUTH` | Set to `"false"` to disable CapJS verification and allow immediate testing. | `"true"` |
 | `CAPTCHA_API_URL` | Optional full URL to a custom CapJS validation API. If set, Workers proxies challenge/redeem endpoints here. | `undefined` |
-| `ALLOWED_IFRAMES` | Comma-separated list of allowed parent domains. Supports wildcards (e.g., `*.example.com`). Supports both quoted and unquoted strings. | `undefined` (Deny All) |
+| `ALLOWED_IFRAMES` | Comma-separated list of allowed parent origins or paths (e.g., `a.com,*.b.com,*.c.com/app/*`). | `undefined` (Deny All) |
 
 ### Service Bindings
 
