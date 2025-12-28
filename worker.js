@@ -16,18 +16,47 @@ const CORS_HEADERS = {
 
 // Security Headers (New)
 const SECURITY_HEADERS = {
-    'X-Frame-Options': 'DENY',
-    'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
-    'X-XSS-Protection': '1; mode=block'
+  'X-Frame-Options': 'DENY',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+  'X-XSS-Protection': '1; mode=block'
 };
 
 // Security Constants
 const AUTH_COOKIE_NAME = 'KSEC_AUTH';
+const CAPTCHA_VALIDATE_API = 'https://cfcap.secops.workers.dev/api/redeem';
+// 90 seconds expiration
+const COOKIE_TTL_MS = 90 * 1000;
+
 const CHUNK_SIZE = 10 * 1024 * 1024;
 const BUFFER = new Uint8Array(CHUNK_SIZE);
 for (let i = 0; i < CHUNK_SIZE; i++) BUFFER[i] = i % 256;
+
+// --- CRYPTO HELPERS ---
+const textEncoder = new TextEncoder();
+
+async function getKey(secret) {
+  return await crypto.subtle.importKey(
+    'raw',
+    textEncoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify']
+  );
+}
+
+async function sign(message, secret) {
+  const key = await getKey(secret);
+  const signature = await crypto.subtle.sign('HMAC', key, textEncoder.encode(message));
+  return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function verify(message, signatureHex, secret) {
+  const key = await getKey(secret);
+  const signature = new Uint8Array(signatureHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+  return await crypto.subtle.verify('HMAC', key, signature, textEncoder.encode(message));
+}
 
 export default {
   async fetch(request, env) {
@@ -35,97 +64,84 @@ export default {
     const path = url.pathname;
     const cookieHeader = request.headers.get('Cookie') || '';
 
-    // --- TURNSTILE INTERCEPTION LOGIC ---
-    
-    // Helper to check for auth cookie
-    const isVerified = cookieHeader.includes(`${AUTH_COOKIE_NAME}=verified`);
-    
-    // 1. Serve Challenge Page for Unverified Root/API requests
-    // We allow /challenge endpoint and /favicon.ico without auth
-    if (!isVerified && path !== '/challenge' && path !== '/favicon.ico') {
-        const challengeHtml = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Check | KSEC</title>
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-    <style>
-        body { font-family: 'Courier New', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f8fafc; color: #1f2937; margin: 0; }
-        .box { background: white; padding: 2rem; border-radius: 4px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); border: 1px solid #e2e8f0; text-align: center; }
-        h1 { margin-bottom: 1.5rem; font-size: 1.2rem; font-weight: bold; }
-        .footer { margin-top: 1rem; font-size: 0.8rem; color: #94a3b8; }
-    </style>
-</head>
-<body>
-    <div class="box">
-        <h1>KSEC Security Check</h1>
-        <div class="cf-turnstile" data-sitekey="${env.turnstile_sitekey}" data-callback="onVerify"></div>
-        <div class="footer">Please verify to continue</div>
-    </div>
-    <script>
-        function onVerify(token) {
-            fetch('/challenge', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token })
-            }).then(res => {
-                if (res.ok) window.location.reload();
-                else alert('Verification failed. Please refresh.');
-            });
-        }
-    </script>
-</body>
-</html>`;
-        
-        return new Response(challengeHtml, {
-            headers: { 'Content-Type': 'text/html;charset=UTF-8' }
+    // --- CAPTCHA VALIDATION ---
+
+    // 1. Validate CapJS Token
+    if (path === '/api/verify' && request.method === 'POST') {
+      try {
+        const { token } = await request.json();
+
+        // Validate with CapJS
+        const capRes = await fetch(CAPTCHA_VALIDATE_API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, sitekey: 'default' }) // Assuming default sitekey for now based on public demo
         });
-    }
 
-    // 2. Handle Turnstile Verification
-    if (path === '/challenge' && request.method === 'POST') {
-        try {
-            const { token } = await request.json();
-            const ip = request.headers.get('CF-Connecting-IP');
-            
-            // Validate with Cloudflare
-            const formData = new FormData();
-            formData.append('secret', env.turnstile_secretkey);
-            formData.append('response', token);
-            formData.append('remoteip', ip);
-            
-            const result = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-                body: formData,
-                method: 'POST',
-            });
-            const outcome = await result.json();
-            
-            if (outcome.success) {
-                // Success: Set Auth Cookie
-                return new Response('{"success": true}', {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Set-Cookie': `${AUTH_COOKIE_NAME}=verified; HttpOnly; Secure; SameSite=Strict; Max-Age=3600; Path=/`
-                    }
-                });
-            } else {
-                return new Response('{"success": false}', { status: 403 });
+        if (capRes.ok) {
+          // Success: Generate Signed Cookie
+          // Format: expiration_ms.signature
+          const expiration = Date.now() + COOKIE_TTL_MS;
+          const message = expiration.toString();
+          const signature = await sign(message, env.HMAC_SECRET);
+          const cookieValue = `${message}.${signature}`;
+
+          return new Response('{"success": true}', {
+            headers: {
+              'Content-Type': 'application/json',
+              'Set-Cookie': `${AUTH_COOKIE_NAME}=${cookieValue}; HttpOnly; Secure; SameSite=Strict; Max-Age=90; Path=/`
             }
-        } catch (e) {
-            return new Response('{"error": "Validation error"}', { status: 500 });
+          });
+        } else {
+          return new Response('{"success": false}', {
+            status: 403,
+            headers: {
+              'Set-Cookie': `${AUTH_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/`
+            }
+          });
         }
+      } catch (e) {
+        return new Response('{"error": "Validation error"}', { status: 500 });
+      }
     }
 
-    // --- APP LOGIC (Protected) ---
+    // 2. Logout / Session Cleanup
+    if (path === '/api/logout' && request.method === 'POST') {
+      return new Response('{"success": true}', {
+        headers: {
+          'Content-Type': 'application/json',
+          'Set-Cookie': `${AUTH_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/`
+        }
+      });
+    }
+
+    // --- APP LOGIC (Protected API) ---
+
+    // Auth Check Helper
+    let isAuthorized = false;
+    const cookie = cookieHeader.split(';').find(c => c.trim().startsWith(`${AUTH_COOKIE_NAME}=`));
+
+    if (cookie) {
+      const val = cookie.split('=')[1];
+      const [expStr, sig] = val.split('.');
+
+      if (expStr && sig) {
+        const exp = parseInt(expStr);
+        // 1. Check Expiration
+        if (Date.now() < exp) {
+          // 2. Verify Signature
+          const isValid = await verify(expStr, sig, env.HMAC_SECRET);
+          if (isValid) isAuthorized = true;
+        }
+      }
+    }
 
     // 3. Serve Frontend Structure (Root)
     if (path === '/' || path === '/index.html') {
       return new Response(html, {
         headers: {
           'Content-Type': 'text/html;charset=UTF-8',
-          'Cache-Control': 'no-cache', 
+          'Cache-Control': 'no-cache',
           ...CORS_HEADERS,
           ...SECURITY_HEADERS // Added Security Headers
         },
@@ -137,19 +153,31 @@ export default {
       return new Response(null, { headers: CORS_HEADERS });
     }
 
-    // 5. API: Ping (Latency)
+    // 5. API: Ping (Latency) - PROTECTED
     if (path === '/api/ping') {
+      if (!isAuthorized) {
+        return new Response('Unauthorized', {
+          status: 401,
+          headers: { 'Set-Cookie': `${AUTH_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/` }
+        });
+      }
       return new Response('pong', {
-        headers: { 
-          ...CORS_HEADERS, 
-          'Cache-Control': 'no-store', 
-          'Content-Type': 'text/plain' 
+        headers: {
+          ...CORS_HEADERS,
+          'Cache-Control': 'no-store',
+          'Content-Type': 'text/plain'
         }
       });
     }
 
-    // 6. API: Download Stream
+    // 6. API: Download Stream - PROTECTED
     if (path === '/api/down') {
+      if (!isAuthorized) {
+        return new Response('Unauthorized', {
+          status: 401,
+          headers: { 'Set-Cookie': `${AUTH_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/` }
+        });
+      }
       const bytes = Math.min(parseInt(url.searchParams.get('bytes') || '50000000'), 100000000);
       const { readable, writable } = new TransformStream();
       const writer = writable.getWriter();
@@ -162,7 +190,7 @@ export default {
             await writer.write(BUFFER.slice(0, toSend));
             sent += toSend;
           }
-        } catch (e) { 
+        } catch (e) {
           // Client disconnected
         } finally {
           await writer.close();
@@ -178,26 +206,32 @@ export default {
       });
     }
 
-    // 7. API: Upload Stream
+    // 7. API: Upload Stream - PROTECTED
     if (path === '/api/up' && request.method === 'POST') {
+      if (!isAuthorized) {
+        return new Response('Unauthorized', {
+          status: 401,
+          headers: { 'Set-Cookie': `${AUTH_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/` }
+        });
+      }
       const startTime = Date.now();
       const reader = request.body.getReader();
       let receivedLength = 0;
-      
+
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           receivedLength += value.length;
         }
-      } catch (e) { 
+      } catch (e) {
         // Stream error 
       }
 
       const duration = Date.now() - startTime;
-      return new Response(JSON.stringify({ 
-        bytesReceived: receivedLength, 
-        durationMs: duration 
+      return new Response(JSON.stringify({
+        bytesReceived: receivedLength,
+        durationMs: duration
       }), {
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });
@@ -206,18 +240,18 @@ export default {
     // 8. API: Metadata
     if (path === '/api/meta') {
       const cf = request.cf || {};
-      
+
       return new Response(JSON.stringify({
         ip: request.headers.get('cf-connecting-ip') || 'Unknown',
         // Fallback chain: CF City -> CF Region -> Unknown
         city: cf.city || 'Unknown City',
-        region: cf.region || cf.regionCode || '', 
+        region: cf.region || cf.regionCode || '',
         country: cf.country || 'XX',
         asn: cf.asn || 'AS---',
         isp: cf.asOrganization || 'Unknown ISP',
         colo: cf.colo || 'Edge'
       }), {
-         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
       });
     }
 

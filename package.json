@@ -1,0 +1,8 @@
+{
+    "name": "speedtest",
+    "version": "1.0.0",
+    "scripts": {
+        "deploy": "chmod +x deploy.sh && ./deploy.sh",
+        "dev": "npx wrangler dev"
+    }
+}

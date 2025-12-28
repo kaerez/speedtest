@@ -8,73 +8,97 @@ kaerez/speedtest/index.html
 -->
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="author" content="Erez Kalman - KSEC">
-    
+
     <!-- Security: Meta Tags -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    
+
     <title>KSEC SPEED TEST</title>
-    
+
     <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
-    
+    <script src="https://cdn.jsdelivr.net/npm/@cap.js/widget@0.1.33/dist/widget.js" type="module"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@cap.js/widget@0.1.33/cap-floating.min.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Rajdhani:wght@500;700&display=swap"
+        rel="stylesheet">
+
     <style>
         /* Clean White Theme Variables */
-        :root { 
-            --bg: #ffffff; 
-            --term: #1f2937; /* slate-800 */
-            --accent: #059669; /* emerald-600 */
-            --border: #e2e8f0; /* slate-200 */
+        :root {
+            --bg: #ffffff;
+            --term: #1f2937;
+            /* slate-800 */
+            --accent: #059669;
+            /* emerald-600 */
+            --border: #e2e8f0;
+            /* slate-200 */
         }
-        body { 
-            background-color: #f8fafc; /* slate-50 */
-            color: var(--term); 
-            font-family: 'Rajdhani', sans-serif; 
-            overflow-x: hidden; 
+
+        body {
+            background-color: #f8fafc;
+            /* slate-50 */
+            color: var(--term);
+            font-family: 'Rajdhani', sans-serif;
+            overflow-x: hidden;
         }
-        .mono { font-family: 'JetBrains Mono', monospace; }
-        
-        .tech-border { 
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .tech-border {
             background: white;
             border: 1px solid var(--border);
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
-            position: relative; 
+            position: relative;
         }
-        .tech-border::after { 
-            content: ''; position: absolute; top: -1px; left: -1px; width: 12px; height: 12px; 
-            border-top: 2px solid var(--accent); border-left: 2px solid var(--accent); 
+
+        .tech-border::after {
+            content: '';
+            position: absolute;
+            top: -1px;
+            left: -1px;
+            width: 12px;
+            height: 12px;
+            border-top: 2px solid var(--accent);
+            border-left: 2px solid var(--accent);
         }
-        .tech-border::before { 
-            content: ''; position: absolute; bottom: -1px; right: -1px; width: 12px; height: 12px; 
-            border-bottom: 2px solid var(--accent); border-right: 2px solid var(--accent); 
+
+        .tech-border::before {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            right: -1px;
+            width: 12px;
+            height: 12px;
+            border-bottom: 2px solid var(--accent);
+            border-right: 2px solid var(--accent);
         }
-        
-        .bg-grid { 
-            background-size: 40px 40px; 
-            background-image: linear-gradient(to right, #00000005 1px, transparent 1px), 
-                              linear-gradient(to bottom, #00000005 1px, transparent 1px); 
+
+        .bg-grid {
+            background-size: 40px 40px;
+            background-image: linear-gradient(to right, #00000005 1px, transparent 1px),
+                linear-gradient(to bottom, #00000005 1px, transparent 1px);
         }
     </style>
 </head>
+
 <body class="min-h-screen flex flex-col bg-grid">
     <div id="root" class="flex-grow flex flex-col relative z-10"></div>
 
     <script type="text/babel">
-        // Security: Frame Buster
-        if (window.self !== window.top) {
-            try { window.top.location = window.self.location; } 
-            catch (e) { document.body.innerHTML = 'Embedding not permitted.'; }
-        }
+        // Security: Frame Buster - REMOVED
 
         const { useState, useEffect, useRef } = React;
 
@@ -95,7 +119,7 @@ kaerez/speedtest/index.html
 
         const getFlag = (cc) => {
             if (!cc || cc === 'XX') return '🌐';
-            return cc.toUpperCase().replace(/./g, char => 
+            return cc.toUpperCase().replace(/./g, char =>
                 String.fromCodePoint(char.charCodeAt(0) + 127397)
             );
         }
@@ -121,7 +145,7 @@ kaerez/speedtest/index.html
                             <circle cx="96" cy="96" r={r} stroke={strokeColor} strokeWidth="8" fill="transparent" strokeDasharray={c} strokeDashoffset={off} strokeLinecap="round" className="transition-all duration-300 ease-out" />
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <span className="text-4xl font-bold mono" style={{color: strokeColor}}>{value.toFixed(1)}</span>
+                            <span className="text-4xl font-bold mono" style={{ color: strokeColor }}>{value.toFixed(1)}</span>
                             <span className="text-xs text-gray-500 font-bold tracking-widest">{unit}</span>
                         </div>
                     </div>
@@ -147,23 +171,52 @@ kaerez/speedtest/index.html
         // --- Main Application ---
         const App = () => {
             const [status, setStatus] = useState('IDLE');
-            const [data, setData] = useState({ 
-                ping: 0, jitter: 0, loss: 0, down: 0, up: 0, 
-                meta: { ip: '---', isp: 'Loading...', country: 'XX', asn: '---', city: '---', region: '', colo: '---' } 
+            const [data, setData] = useState({
+                ping: 0, jitter: 0, loss: 0, down: 0, up: 0,
+                meta: { ip: '---', isp: 'Loading...', country: 'XX', asn: '---', city: '---', region: '', colo: '---' }
             });
             const [logs, setLogs] = useState([]);
-            
+
             useEffect(() => { log('SYSTEM READY'); }, []);
             const log = (m) => setLogs(p => [...p, `[${getTimestamp()}] > ${m}`]);
 
             useEffect(() => {
                 fetch('/api/meta')
                     .then(r => r.json())
-                    .then(m => { 
-                        setData(d => ({...d, meta: m})); 
+                    .then(m => {
+                        setData(d => ({ ...d, meta: m }));
                     })
                     .catch(e => { console.error(e); log('ERROR: FAILED TO FETCH METADATA'); });
                 setTimeout(() => lucide.createIcons(), 100);
+
+                // CapJS Listener
+                const widget = document.getElementById('cap-widget');
+                if (widget) {
+                    widget.addEventListener('solve', async (e) => {
+                        const token = e.detail.token;
+                        log('VERIFYING TOKEN...');
+
+                        try {
+                            const res = await fetch('/api/verify', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ token })
+                            });
+
+                            if (res.ok) {
+                                log('VERIFICATION SUCCESSFUL');
+                                runTest();
+                            } else {
+                                log('ERROR: VERIFICATION FAILED');
+                                setStatus('IDLE');
+                            }
+                        } catch (err) {
+                            console.error(err);
+                            log('ERROR: VERIFICATION ERROR');
+                            setStatus('IDLE');
+                        }
+                    });
+                }
             }, []);
 
             // Helper to determine best location string
@@ -175,9 +228,9 @@ kaerez/speedtest/index.html
             };
 
             const runTest = async () => {
-                if(status === 'RUNNING') return;
+                if (status === 'RUNNING') return;
                 setStatus('RUNNING');
-                setData(d => ({...d, down: 0, up: 0, ping: 0, jitter: 0, loss: 0}));
+                setData(d => ({ ...d, down: 0, up: 0, ping: 0, jitter: 0, loss: 0 }));
                 log('TEST INITIATED...');
 
                 try {
@@ -185,38 +238,45 @@ kaerez/speedtest/index.html
                     log('MEASURING LATENCY & LOSS...');
                     let pings = [];
                     let failedPings = 0;
-                    for(let i=0; i<10; i++) {
+                    for (let i = 0; i < 10; i++) {
                         const s = performance.now();
                         try {
                             const res = await fetch('/api/ping');
+                            if (res.status === 401) throw new Error('Unauthorized');
                             if (!res.ok) throw new Error('Ping failed');
                             pings.push(performance.now() - s);
-                        } catch (e) { failedPings++; }
+                        } catch (e) {
+                            if (e.message === 'Unauthorized') throw e;
+                            failedPings++;
+                        }
                     }
-                    
+
                     const loss = (failedPings / 10) * 100;
                     const minPing = pings.length > 0 ? Math.min(...pings) : 0;
-                    const jitter = pings.length > 1 ? Math.abs(pings[0] - pings[pings.length-1]) : 0;
-                    setData(d => ({...d, ping: minPing, jitter, loss}));
+                    const jitter = pings.length > 1 ? Math.abs(pings[0] - pings[pings.length - 1]) : 0;
+                    setData(d => ({ ...d, ping: minPing, jitter, loss }));
 
                     // 2. DOWNLOAD
                     log('DOWNLOADING...');
                     const dlStart = performance.now();
                     let dlBytes = 0;
                     const dlDuration = 10000;
-                    
-                    while(performance.now() - dlStart < dlDuration) {
+
+                    while (performance.now() - dlStart < dlDuration) {
                         try {
                             const res = await fetch(`/api/down?bytes=${10 * 1024 * 1024}`);
+                            if (res.status === 401) throw new Error('Unauthorized');
                             const reader = res.body.getReader();
-                            while(true) {
-                                const {done, value} = await reader.read();
-                                if(done) break;
+                            while (true) {
+                                const { done, value } = await reader.read();
+                                if (done) break;
                                 dlBytes += value.length;
                                 const elapsed = (performance.now() - dlStart) / 1000;
-                                if (elapsed > 0) setData(d => ({...d, down: (dlBytes * 8) / (elapsed * 1000 * 1000)}));
+                                if (elapsed > 0) setData(d => ({ ...d, down: (dlBytes * 8) / (elapsed * 1000 * 1000) }));
                             }
-                        } catch (e) {}
+                        } catch (e) {
+                            if (e.message === 'Unauthorized') throw e;
+                        }
                     }
 
                     // 3. UPLOAD
@@ -224,15 +284,18 @@ kaerez/speedtest/index.html
                     const ulStart = performance.now();
                     let ulBytes = 0;
                     const ulDuration = 10000;
-                    const chunk = new Uint8Array(1024 * 1024); 
-                    
-                    while(performance.now() - ulStart < ulDuration) {
+                    const chunk = new Uint8Array(1024 * 1024);
+
+                    while (performance.now() - ulStart < ulDuration) {
                         try {
-                            await fetch('/api/up', { method: 'POST', body: chunk });
+                            const res = await fetch('/api/up', { method: 'POST', body: chunk });
+                            if (res.status === 401) throw new Error('Unauthorized');
                             ulBytes += chunk.length;
                             const elapsed = (performance.now() - ulStart) / 1000;
-                            if (elapsed > 0) setData(d => ({...d, up: (ulBytes * 8) / (elapsed * 1000 * 1000)}));
-                        } catch (e) {}
+                            if (elapsed > 0) setData(d => ({ ...d, up: (ulBytes * 8) / (elapsed * 1000 * 1000) }));
+                        } catch (e) {
+                            if (e.message === 'Unauthorized') throw e;
+                        }
                     }
 
                     setStatus('COMPLETE');
@@ -242,23 +305,33 @@ kaerez/speedtest/index.html
                     log(`PROVIDER: ${data.meta.isp} (AS${data.meta.asn})`);
                     log(`LOCATION: ${getLocationDisplay()}, ${data.meta.country}`);
                     log(`SERVER:   ${data.meta.colo} (${getColoRegion(data.meta.colo)})`);
-                    log(`DOWN:     ${((dlBytes * 8) / (dlDuration/1000 * 1000 * 1000)).toFixed(2)} Mbps`);
-                    log(`UP:       ${((ulBytes * 8) / (ulDuration/1000 * 1000 * 1000)).toFixed(2)} Mbps`);
+                    log(`DOWN:     ${((dlBytes * 8) / (dlDuration / 1000 * 1000 * 1000)).toFixed(2)} Mbps`);
+                    log(`UP:       ${((ulBytes * 8) / (ulDuration / 1000 * 1000 * 1000)).toFixed(2)} Mbps`);
                     log(`PING:     ${minPing.toFixed(0)} ms`);
                     log(`JITTER:   ${jitter.toFixed(0)} ms`);
                     log(`LOSS:     ${loss.toFixed(1)}%`);
                     log('--------------------------------');
 
+                    // CLEANUP SESSION
+                    await fetch('/api/logout', { method: 'POST' });
+                    log('SESSION CLOSED');
+
                 } catch (err) {
                     console.error(err);
-                    log('CRITICAL ERROR OCCURRED');
+                    if (err.message === 'Unauthorized' || err.message.includes('401')) {
+                        // Session expired - silent fail to IDLE
+                    } else {
+                        log('CRITICAL ERROR OCCURRED');
+                    }
                     setStatus('IDLE');
+                    // Ensure cleanup on error too
+                    fetch('/api/logout', { method: 'POST' });
                 }
             };
 
             return (
                 <div className="flex flex-col items-center justify-center min-h-screen p-4 max-w-6xl mx-auto w-full">
-                    
+
                     <header className="w-full border-b border-slate-200 pb-4 mb-8 flex justify-between items-end">
                         <div>
                             <h1 className="text-4xl font-bold text-slate-800 tracking-tighter">
@@ -269,16 +342,16 @@ kaerez/speedtest/index.html
                             </p>
                         </div>
                         <div className="text-right hidden sm:block">
-                             <div className="flex items-center justify-end gap-2 text-xl font-bold text-slate-800">
+                            <div className="flex items-center justify-end gap-2 text-xl font-bold text-slate-800">
                                 {getFlag(data.meta.country)} {data.meta.country}
-                             </div>
-                             <div className="flex flex-col items-end">
-                                 <a href={`https://radar.cloudflare.com/ip/${data.meta.ip}`} target="_blank" rel="noreferrer" className="flex items-center text-xs font-mono text-slate-500 font-bold text-blue-600 underline hover:text-blue-800 transition-colors">
+                            </div>
+                            <div className="flex flex-col items-end">
+                                <a href={`https://radar.cloudflare.com/ip/${data.meta.ip}`} target="_blank" rel="noreferrer" className="flex items-center text-xs font-mono text-slate-500 font-bold text-blue-600 underline hover:text-blue-800 transition-colors">
                                     {data.meta.ip}
                                     <ExternalIcon />
-                                 </a>
-                                 <div className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">{getIpVersion(data.meta.ip)}</div>
-                             </div>
+                                </a>
+                                <div className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">{getIpVersion(data.meta.ip)}</div>
+                            </div>
                         </div>
                     </header>
 
@@ -288,14 +361,14 @@ kaerez/speedtest/index.html
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full mb-6">
-                        <StatBox 
+                        <StatBox
                             icon={<i data-lucide="activity" className="w-4 h-4 text-emerald-600"></i>}
                             label="Quality"
                             value={`${data.ping.toFixed(0)} ms`}
                             subValue={`Jitter: ${data.jitter.toFixed(0)} ms`}
                             extraValue={`Loss: ${data.loss.toFixed(1)}%`}
                         />
-                         <StatBox 
+                        <StatBox
                             icon={<i data-lucide="network" className="w-4 h-4 text-emerald-600"></i>}
                             label="Provider"
                             value={data.meta.isp}
@@ -306,15 +379,15 @@ kaerez/speedtest/index.html
                                         <ExternalIcon />
                                     </a>
                                 </span>
-                            } 
+                            }
                         />
-                         <StatBox 
+                        <StatBox
                             icon={<i data-lucide="map-pin" className="w-4 h-4 text-emerald-600"></i>}
                             label="Location"
                             value={getLocationDisplay()}
                             subValue={`${getFlag(data.meta.country)} ${data.meta.country}`}
                         />
-                         <StatBox 
+                        <StatBox
                             icon={<i data-lucide="server" className="w-4 h-4 text-emerald-600"></i>}
                             label="Test Server"
                             value={data.meta.colo}
@@ -323,19 +396,29 @@ kaerez/speedtest/index.html
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mb-8">
-                        <button 
-                            onClick={runTest} 
-                            disabled={status === 'RUNNING'} 
-                            className={`
-                                md:col-span-1 tech-border py-4 font-bold tracking-widest uppercase transition-all duration-300 rounded-sm
-                                ${status === 'RUNNING' 
-                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-                                    : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg hover:shadow-emerald-200'}
-                            `}
-                        >
-                            {status === 'RUNNING' ? 'Running Analysis...' : 'Start Test'}
-                        </button>
-                        
+                        <div className="flex justify-center md:col-span-1">
+                            <cap-widget
+                                id="cap-widget"
+                                data-cap-api-endpoint="https://cfcap.secops.workers.dev/api/"
+                                style={{ display: 'none' }} // Hidden initally, managed by floating lib
+                            ></cap-widget>
+
+                            <button
+                                id="start-btn"
+                                data-cap-floating="#cap-widget"
+                                data-cap-floating-position="bottom"
+                                disabled={status === 'RUNNING'}
+                                className={`
+                                    w-full tech-border py-4 font-bold tracking-widest uppercase transition-all duration-300 rounded-sm
+                                    ${status === 'RUNNING'
+                                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                        : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg hover:shadow-emerald-200'}
+                                `}
+                            >
+                                {status === 'RUNNING' ? 'Running Analysis...' : 'Start Test'}
+                            </button>
+                        </div>
+
                         <div className="md:col-span-2 tech-border bg-slate-50 p-3 font-mono text-xs flex flex-col justify-end h-48 rounded-sm border-slate-200 overflow-hidden">
                             <div className="overflow-y-auto flex flex-col-reverse h-full scrollbar-thin scrollbar-thumb-slate-200">
                                 {logs.map((l, i) => (
@@ -358,7 +441,7 @@ kaerez/speedtest/index.html
                             <ExternalIcon />
                         </a>
                     </div>
-                    
+
                     <footer className="mt-8 text-center text-xs text-slate-400 uppercase tracking-widest hover:text-emerald-600 transition-colors">
                         <a href="https://github.com/kaerez/speedtest/" target="_blank" rel="noopener noreferrer">
                             GitHub Repository & Licensing
@@ -371,4 +454,5 @@ kaerez/speedtest/index.html
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
+
 </html>
