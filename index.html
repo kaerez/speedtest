@@ -28,7 +28,7 @@ kaerez/speedtest/index.html
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@cap.js/widget@0.1.33/dist/widget.js" type="module"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@cap.js/widget@0.1.33/cap-floating.min.js"></script>
+
     <link
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Rajdhani:wght@500;700&display=swap"
         rel="stylesheet">
@@ -217,6 +217,18 @@ kaerez/speedtest/index.html
                         }
                     });
                 }
+
+                // Inject floating script dynamically to handle React render timing
+                const script = document.createElement('script');
+                script.src = "https://cdn.jsdelivr.net/npm/@cap.js/widget@0.1.33/cap-floating.min.js";
+                script.async = true;
+                document.body.appendChild(script);
+
+                return () => {
+                    if (document.body.contains(script)) {
+                        document.body.removeChild(script);
+                    }
+                };
             }, []);
 
             // Helper to determine best location string
