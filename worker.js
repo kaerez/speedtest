@@ -33,30 +33,7 @@ const CHUNK_SIZE = 10 * 1024 * 1024;
 const BUFFER = new Uint8Array(CHUNK_SIZE);
 for (let i = 0; i < CHUNK_SIZE; i++) BUFFER[i] = i % 256;
 
-// --- CRYPTO HELPERS ---
 const textEncoder = new TextEncoder();
-
-async function getKey(secret) {
-  return await crypto.subtle.importKey(
-    'raw',
-    textEncoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign', 'verify']
-  );
-}
-
-async function sign(message, secret) {
-  const key = await getKey(secret);
-  const signature = await crypto.subtle.sign('HMAC', key, textEncoder.encode(message));
-  return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function verify(message, signatureHex, secret) {
-  const key = await getKey(secret);
-  const signature = new Uint8Array(signatureHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-  return await crypto.subtle.verify('HMAC', key, signature, textEncoder.encode(message));
-}
 
 export default {
   async fetch(request, env) {
@@ -69,10 +46,6 @@ export default {
     // 1. Validate CapJS Token
     if (path === '/api/verify' && request.method === 'POST') {
       try {
-        if (!env.HMAC_SECRET) {
-          console.error('CRITICAL: HMAC_SECRET is not set in environment variables.');
-          return new Response('{"error": "Server configuration error"}', { status: 500 });
-        }
         const { token } = await request.json();
 
         // Validate with CapJS
@@ -81,14 +54,10 @@ export default {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token })
         });
-
         if (capRes.ok) {
-          // Success: Generate Signed Cookie
-          // Format: expiration_ms.signature
+          // Success: Generate Simple Session Cookie (Timestamp only)
           const expiration = Date.now() + COOKIE_TTL_MS;
-          const message = expiration.toString();
-          const signature = await sign(message, env.HMAC_SECRET);
-          const cookieValue = `${message}.${signature}`;
+          const cookieValue = expiration.toString();
 
           return new Response('{"success": true}', {
             headers: {
@@ -130,15 +99,12 @@ export default {
 
     if (cookie) {
       const val = cookie.split('=')[1];
-      const [expStr, sig] = val.split('.');
-
-      if (expStr && sig) {
-        const exp = parseInt(expStr);
-        // 1. Check Expiration
-        if (Date.now() < exp) {
-          // 2. Verify Signature
-          const isValid = await verify(expStr, sig, env.HMAC_SECRET);
-          if (isValid) isAuthorized = true;
+      // Value is just the expiration timestamp
+      if (val) {
+        const exp = parseInt(val);
+        // Check Expiration
+        if (!isNaN(exp) && Date.now() < exp) {
+          isAuthorized = true;
         }
       }
     }

@@ -3,8 +3,7 @@
     "version": "1.0.0",
     "scripts": {
         "deploy": "chmod +x deploy.sh && ./deploy.sh",
-        "dev": "npx wrangler dev",
-        "postinstall": "chmod +x deploy.sh && ./deploy.sh --setup-only"
+        "dev": "npx wrangler dev"
     },
     "devDependencies": {
         "wrangler": "^3.0.0"
