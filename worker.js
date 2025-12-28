@@ -51,8 +51,15 @@ export default {
         // Validate with CapJS
         const capRes = await fetch(CAPTCHA_VALIDATE_API, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', "Origin": "https://speedtest.secops.workers.dev" },
-          body: JSON.stringify({ token })
+          headers: {
+            "Content-Type": "application/json",
+            "Origin": "https://speedtest.secops.workers.dev" // Host header forwarding
+          },
+          body: JSON.stringify({ token }),
+          cf: {
+            // Force external resolution/routing to avoid loop protection
+            resolveOverride: 'cfcap.secops.workers.dev'
+          }
         });
         if (capRes.ok) {
           // Success: Generate Simple Session Cookie (Timestamp only)
