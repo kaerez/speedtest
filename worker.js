@@ -79,7 +79,7 @@ export default {
         const capRes = await fetch(CAPTCHA_VALIDATE_API, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, sitekey: 'default' }) // Assuming default sitekey for now based on public demo
+          body: JSON.stringify({ token })
         });
 
         if (capRes.ok) {
@@ -97,9 +97,12 @@ export default {
             }
           });
         } else {
-          return new Response('{"success": false}', {
+          const errorText = await capRes.text();
+          console.error('CapJS Validation Failed:', capRes.status, errorText);
+          return new Response(JSON.stringify({ success: false, error: 'Captcha validation failed', details: errorText, status: capRes.status }), {
             status: 403,
             headers: {
+              'Content-Type': 'application/json',
               'Set-Cookie': `${AUTH_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/`
             }
           });
