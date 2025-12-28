@@ -177,6 +177,11 @@ kaerez/speedtest/index.html
             });
             const [logs, setLogs] = useState([]);
             const tokenRef = useRef(null);
+            const dataRef = useRef(data);
+            const statusRef = useRef(status);
+
+            useEffect(() => { dataRef.current = data; }, [data]);
+            useEffect(() => { statusRef.current = status; }, [status]);
 
             useEffect(() => { log('SYSTEM READY'); }, []);
             const log = (m) => setLogs(p => [...p, `[${getTimestamp()}] > ${m}`]);
@@ -234,15 +239,15 @@ kaerez/speedtest/index.html
             }, []);
 
             // Helper to determine best location string
-            const getLocationDisplay = () => {
-                const { city, region } = data.meta;
+            const getLocationDisplay = (meta) => {
+                const { city, region } = meta || dataRef.current.meta;
                 if (city && city !== 'Unknown City') return city;
                 if (region) return region;
                 return 'Unknown Location';
             };
 
             const runTest = async () => {
-                if (status === 'RUNNING') return;
+                if (statusRef.current === 'RUNNING') return;
                 setStatus('RUNNING');
                 setData(d => ({ ...d, down: 0, up: 0, ping: 0, jitter: 0, loss: 0 }));
                 log('TEST INITIATED...');
@@ -313,12 +318,13 @@ kaerez/speedtest/index.html
                     }
 
                     setStatus('COMPLETE');
+                    const meta = dataRef.current.meta;
                     log('TEST COMPLETE');
                     log('--------------------------------');
-                    log(`RESULTS FOR ${data.meta.ip}`);
-                    log(`PROVIDER: ${data.meta.isp} (AS${data.meta.asn})`);
-                    log(`LOCATION: ${getLocationDisplay()}, ${data.meta.country}`);
-                    log(`SERVER:   ${data.meta.colo} (${getColoRegion(data.meta.colo)})`);
+                    log(`RESULTS FOR ${meta.ip}`);
+                    log(`PROVIDER: ${meta.isp} (AS${meta.asn})`);
+                    log(`LOCATION: ${getLocationDisplay(meta)}, ${meta.country}`);
+                    log(`SERVER:   ${meta.colo} (${getColoRegion(meta.colo)})`);
                     log(`DOWN:     ${((dlBytes * 8) / (dlDuration / 1000 * 1000 * 1000)).toFixed(2)} Mbps`);
                     log(`UP:       ${((ulBytes * 8) / (ulDuration / 1000 * 1000 * 1000)).toFixed(2)} Mbps`);
                     log(`PING:     ${minPing.toFixed(0)} ms`);
