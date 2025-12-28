@@ -1,8 +1,9 @@
 #!/bin/bash
 set -e # Exit on error
 
-echo "Generating HMAC_SECRET (UUIDv4)..."
-SECRET=$(uuidgen | tr '[:upper:]' '[:lower:]')
+echo "Generating HMAC_SECRET (UUIDv4 via OpenSSL)..."
+# Use openssl as uuidgen is not available in all CI environments
+SECRET=$(openssl rand -hex 16)
 
 if [ -z "$SECRET" ]; then
     echo "Error: Failed to generate UUID."
