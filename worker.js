@@ -25,7 +25,7 @@ const SECURITY_HEADERS = {
 
 // Security Constants
 const AUTH_COOKIE_NAME = 'KSEC_AUTH';
-const CAPTCHA_VALIDATE_API = 'https://cfcap.secops.workers.dev/api/redeem';
+const CAPTCHA_VALIDATE_API = 'https://cfcap.secops.workers.dev/api/validate';
 // 90 seconds expiration
 const COOKIE_TTL_MS = 90 * 1000;
 
