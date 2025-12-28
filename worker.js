@@ -69,6 +69,10 @@ export default {
     // 1. Validate CapJS Token
     if (path === '/api/verify' && request.method === 'POST') {
       try {
+        if (!env.HMAC_SECRET) {
+          console.error('CRITICAL: HMAC_SECRET is not set in environment variables.');
+          return new Response('{"error": "Server configuration error"}', { status: 500 });
+        }
         const { token } = await request.json();
 
         // Validate with CapJS
