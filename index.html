@@ -186,23 +186,14 @@ kaerez/speedtest/index.html
             useEffect(() => { log('SYSTEM READY'); }, []);
             const log = (m) => setLogs(p => [...p, `[${getTimestamp()}] > ${m}`]);
 
-            // Metadata now protected, fetched after captcha solve
-            const fetchMetadata = async (token) => {
-                try {
-                    const r = await fetch('/api/meta', { headers: { 'X-Cap-Token': token } });
-                    if (!r.ok) throw new Error('Meta fetch failed');
-                    const m = await r.json();
-                    setData(d => ({ ...d, meta: m }));
-                } catch (e) {
-                    console.error(e);
-                    log('ERROR: FAILED TO FETCH METADATA');
-                }
-            };
-
             useEffect(() => {
-                log('SYSTEM READY');
+                fetch('/api/meta')
+                    .then(r => r.json())
+                    .then(m => {
+                        setData(d => ({ ...d, meta: m }));
+                    })
+                    .catch(e => { console.error(e); log('ERROR: FAILED TO FETCH METADATA'); });
                 setTimeout(() => lucide.createIcons(), 100);
-
 
                 // CapJS Listener
                 const widget = document.getElementById('cap-widget');
@@ -221,7 +212,6 @@ kaerez/speedtest/index.html
 
                             if (res.ok) {
                                 log('VERIFICATION SUCCESSFUL');
-                                await fetchMetadata(token);
                                 runTest();
                             } else {
                                 log('ERROR: VERIFICATION FAILED');
@@ -270,7 +260,7 @@ kaerez/speedtest/index.html
                     for (let i = 0; i < 10; i++) {
                         const s = performance.now();
                         try {
-                            const res = await fetch('/api/ping', { headers: { 'X-Cap-Token': tokenRef.current } });
+                            const res = await fetch('/api/ping');
                             if (res.status === 401) throw new Error('Unauthorized');
                             if (!res.ok) throw new Error('Ping failed');
                             pings.push(performance.now() - s);
@@ -293,9 +283,7 @@ kaerez/speedtest/index.html
 
                     while (performance.now() - dlStart < dlDuration) {
                         try {
-                            const res = await fetch(`/api/down?bytes=${10 * 1024 * 1024}`, {
-                                headers: { 'X-Cap-Token': tokenRef.current }
-                            });
+                            const res = await fetch(`/api/down?bytes=${10 * 1024 * 1024}`);
                             if (res.status === 401) throw new Error('Unauthorized');
                             const reader = res.body.getReader();
                             while (true) {
@@ -319,11 +307,7 @@ kaerez/speedtest/index.html
 
                     while (performance.now() - ulStart < ulDuration) {
                         try {
-                            const res = await fetch('/api/up', {
-                                method: 'POST',
-                                body: chunk,
-                                headers: { 'X-Cap-Token': tokenRef.current }
-                            });
+                            const res = await fetch('/api/up', { method: 'POST', body: chunk });
                             if (res.status === 401) throw new Error('Unauthorized');
                             ulBytes += chunk.length;
                             const elapsed = (performance.now() - ulStart) / 1000;
