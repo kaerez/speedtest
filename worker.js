@@ -24,9 +24,7 @@ const SECURITY_HEADERS = {
 };
 
 // Security Constants
-const AUTH_COOKIE_NAME = 'KSEC_AUTH';
-// 90 seconds expiration
-const COOKIE_TTL_MS = 90 * 1000;
+// Removed AUTH_COOKIE_NAME and COOKIE_TTL_MS as we are now stateless
 
 const CHUNK_SIZE = 10 * 1024 * 1024;
 const BUFFER = new Uint8Array(CHUNK_SIZE);
@@ -38,19 +36,13 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
-    const cookieHeader = request.headers.get('Cookie') || '';
 
-    // --- CAPTCHA VALIDATION ---
+    // --- HELPER: Validate Token per Request ---
+    async function validateRequest(req) {
+      const token = req.headers.get('X-Cap-Token');
+      if (!token) return false;
 
-    // 1. Validate CapJS Token
-    if (path === '/api/verify' && request.method === 'POST') {
       try {
-        const { token } = await request.json();
-
-        // Validate with CapJS via Service Binding
-        // Note: Using a dummy internal URL or just path is fine for bindings, 
-        // but explicit full URL is safer for some libraries.
-        // We target the same path /api/validate.
         const capRes = await env.CFCAP.fetch(new Request('https://cfcap/api/validate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -59,26 +51,37 @@ export default {
             keepToken: true
           })
         }));
-        if (capRes.ok) {
-          // Success: Generate Simple Session Cookie (Timestamp only)
-          const expiration = Date.now() + COOKIE_TTL_MS;
-          const cookieValue = expiration.toString();
+        const res = await capRes.json();
+        return res.success === true;
+      } catch (e) {
+        return false;
+      }
+    }
 
+    // --- CAPTCHA VALIDATION (UI Check only) ---
+    // Kept for UI feedback "Verification Successful", though technically redundant if every call is checked.
+    if (path === '/api/verify' && request.method === 'POST') {
+      try {
+        const { token } = await request.json();
+
+        const capRes = await env.CFCAP.fetch(new Request('https://cfcap/api/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token,
+            keepToken: true
+          })
+        }));
+
+        if (capRes.ok) {
           return new Response('{"success": true}', {
-            headers: {
-              'Content-Type': 'application/json',
-              'Set-Cookie': `${AUTH_COOKIE_NAME}=${cookieValue}; HttpOnly; Secure; SameSite=Strict; Max-Age=90; Path=/`
-            }
+            headers: { 'Content-Type': 'application/json' }
           });
         } else {
           const errorText = await capRes.text();
-          console.error('CapJS Validation Failed:', capRes.status, errorText);
-          return new Response(JSON.stringify({ success: false, error: 'Captcha validation failed', details: errorText, status: capRes.status }), {
+          return new Response(JSON.stringify({ success: false, error: 'Captcha validation failed', details: errorText }), {
             status: 403,
-            headers: {
-              'Content-Type': 'application/json',
-              'Set-Cookie': `${AUTH_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/`
-            }
+            headers: { 'Content-Type': 'application/json' }
           });
         }
       } catch (e) {
@@ -91,7 +94,6 @@ export default {
       try {
         const body = await request.clone().json().catch(() => ({}));
         if (body.token) {
-          // Fire and forget (or await if strict) delete call
           await env.CFCAP.fetch(new Request('https://cfcap/api/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -103,58 +105,37 @@ export default {
       } catch (e) {
         // Ignore errors during logout
       }
-
       return new Response('{"success": true}', {
-        headers: {
-          'Content-Type': 'application/json',
-          'Set-Cookie': `${AUTH_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/`
-        }
+        headers: { 'Content-Type': 'application/json' }
       });
     }
 
     // --- APP LOGIC (Protected API) ---
 
-    // Auth Check Helper
-    let isAuthorized = false;
-    const cookie = cookieHeader.split(';').find(c => c.trim().startsWith(`${AUTH_COOKIE_NAME}=`));
-
-    if (cookie) {
-      const val = cookie.split('=')[1];
-      // Value is just the expiration timestamp
-      if (val) {
-        const exp = parseInt(val);
-        // Check Expiration
-        if (!isNaN(exp) && Date.now() < exp) {
-          isAuthorized = true;
-        }
-      }
-    }
-
-    // 3. Serve Frontend Structure (Root)
+    // 3. Serve Frontend Structure (Root) - PUBLIC
     if (path === '/' || path === '/index.html') {
       return new Response(html, {
         headers: {
           'Content-Type': 'text/html;charset=UTF-8',
           'Cache-Control': 'no-cache',
           ...CORS_HEADERS,
-          ...SECURITY_HEADERS // Added Security Headers
+          ...SECURITY_HEADERS
         },
       });
     }
 
     // 4. API Preflight
     if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: CORS_HEADERS });
+      const headers = { ...CORS_HEADERS };
+      if (request.headers.get('Access-Control-Request-Headers')) {
+        headers['Access-Control-Allow-Headers'] = request.headers.get('Access-Control-Request-Headers');
+      }
+      return new Response(null, { headers });
     }
 
     // 5. API: Ping (Latency) - PROTECTED
     if (path === '/api/ping') {
-      if (!isAuthorized) {
-        return new Response('Unauthorized', {
-          status: 401,
-          headers: { 'Set-Cookie': `${AUTH_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/` }
-        });
-      }
+      if (!await validateRequest(request)) return new Response('Unauthorized', { status: 401 });
       return new Response('pong', {
         headers: {
           ...CORS_HEADERS,
@@ -166,12 +147,8 @@ export default {
 
     // 6. API: Download Stream - PROTECTED
     if (path === '/api/down') {
-      if (!isAuthorized) {
-        return new Response('Unauthorized', {
-          status: 401,
-          headers: { 'Set-Cookie': `${AUTH_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/` }
-        });
-      }
+      if (!await validateRequest(request)) return new Response('Unauthorized', { status: 401 });
+
       const bytes = Math.min(parseInt(url.searchParams.get('bytes') || '50000000'), 100000000);
       const { readable, writable } = new TransformStream();
       const writer = writable.getWriter();
@@ -202,12 +179,8 @@ export default {
 
     // 7. API: Upload Stream - PROTECTED
     if (path === '/api/up' && request.method === 'POST') {
-      if (!isAuthorized) {
-        return new Response('Unauthorized', {
-          status: 401,
-          headers: { 'Set-Cookie': `${AUTH_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/` }
-        });
-      }
+      if (!await validateRequest(request)) return new Response('Unauthorized', { status: 401 });
+
       const startTime = Date.now();
       const reader = request.body.getReader();
       let receivedLength = 0;
@@ -231,13 +204,14 @@ export default {
       });
     }
 
-    // 8. API: Metadata
+    // 8. API: Metadata - PROTECTED
     if (path === '/api/meta') {
+      if (!await validateRequest(request)) return new Response('Unauthorized', { status: 401 });
+
       const cf = request.cf || {};
 
       return new Response(JSON.stringify({
         ip: request.headers.get('cf-connecting-ip') || 'Unknown',
-        // Fallback chain: CF City -> CF Region -> Unknown
         city: cf.city || 'Unknown City',
         region: cf.region || cf.regionCode || '',
         country: cf.country || 'XX',
