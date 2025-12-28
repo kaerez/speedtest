@@ -283,7 +283,7 @@ export default {
 
       // 9. CapJS Proxy (Option A: Service Binding)
       // If no external API is set, proxy client requests to the bound fallback worker
-      if (!capApiBase && (path.startsWith('/api/challenge') || path.startsWith('/api/sitekey') || path.startsWith('/api/theme') || path.startsWith('/api/lang'))) {
+      if (!capApiBase && (path.startsWith('/api/challenge') || path.startsWith('/api/sitekey') || path.startsWith('/api/theme') || path.startsWith('/api/lang') || path.startsWith('/api/redeem'))) {
         const proxyUrl = new URL(request.url);
         proxyUrl.host = 'cfcap'; // Service Binding ignores host, but URL needs one
         // Forward the request to the bound worker
