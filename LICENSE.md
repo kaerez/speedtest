@@ -1,8 +1,7 @@
 > License to use this software under the PolyForm Noncommercial License 1.0.0
 is expressly conditioned upon the user having a valid, signed Contributor
-License Agreement (CLA) on file with KSEC - Erez Kalman.
-
-## Author: Erez Kalman - KSEC
+License Agreement (CLA) on file with KSEC - Erez Kalman.  
+> Author: Erez Kalman - KSEC
 
 # PolyForm Noncommercial License 1.0.0
 
