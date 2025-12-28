@@ -160,7 +160,7 @@ export default {
       if (path === '/' || path === '/index.html') {
         const config = {
           requireAuth: env.SPEEDTEST_REQUIRE_AUTH !== 'false',
-          captchaApiUrl: capApiBase
+          captchaApiUrl: capApiBase || '/api' // Fallback to internal proxy if no external URL
         };
 
         const modifiedHtml = html.replace(
@@ -266,7 +266,7 @@ export default {
 
       // 8. API: Metadata
       if (path === '/api/meta') {
-        if (!isAuthorized) return new Response('Unauthorized', { status: 401 });
+        // Publicly accessible for dashboard initialization
         const cf = request.cf || {};
         return new Response(JSON.stringify({
           ip: request.headers.get('cf-connecting-ip') || 'Unknown',
@@ -279,6 +279,15 @@ export default {
         }), {
           headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
         });
+      }
+
+      // 9. CapJS Proxy (Option A: Service Binding)
+      // If no external API is set, proxy client requests to the bound fallback worker
+      if (!capApiBase && (path.startsWith('/api/challenge') || path.startsWith('/api/sitekey') || path.startsWith('/api/theme') || path.startsWith('/api/lang'))) {
+        const proxyUrl = new URL(request.url);
+        proxyUrl.host = 'cfcap'; // Service Binding ignores host, but URL needs one
+        // Forward the request to the bound worker
+        return env.CFCAP.fetch(new Request(proxyUrl, request));
       }
 
       return new Response('Not Found', { status: 404 });
