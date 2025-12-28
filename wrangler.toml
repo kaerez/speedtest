@@ -17,3 +17,7 @@ fallthrough = false
 
 [observability]
 enabled = true
+
+[[services]]
+binding = "CFCAP"
+service = "cfcap"

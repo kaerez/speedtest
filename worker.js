@@ -25,7 +25,6 @@ const SECURITY_HEADERS = {
 
 // Security Constants
 const AUTH_COOKIE_NAME = 'KSEC_AUTH';
-const CAPTCHA_VALIDATE_API = 'https://cfcap.secops.workers.dev/api/validate';
 // 90 seconds expiration
 const COOKIE_TTL_MS = 90 * 1000;
 
@@ -48,19 +47,15 @@ export default {
       try {
         const { token } = await request.json();
 
-        // Validate with CapJS
-        const capRes = await fetch(CAPTCHA_VALIDATE_API, {
+        // Validate with CapJS via Service Binding
+        // Note: Using a dummy internal URL or just path is fine for bindings, 
+        // but explicit full URL is safer for some libraries.
+        // We target the same path /api/validate.
+        const capRes = await env.CFCAP.fetch(new Request('https://cfcap/api/validate', {
           method: 'POST',
-          headers: {
-            "Content-Type": "application/json",
-            "Origin": "https://speedtest.secops.workers.dev" // Host header forwarding
-          },
-          body: JSON.stringify({ token }),
-          cf: {
-            // Force external resolution/routing to avoid loop protection
-            resolveOverride: 'cfcap.secops.workers.dev'
-          }
-        });
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        }));
         if (capRes.ok) {
           // Success: Generate Simple Session Cookie (Timestamp only)
           const expiration = Date.now() + COOKIE_TTL_MS;
