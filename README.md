@@ -1,6 +1,7 @@
 # KSEC Speed Test
 
-A high-performance, privacy-focused network speed test application built on **Cloudflare Workers**.
+A high-performance, privacy-focused network speed test application built on **Cloudflare Workers**.  
+Check it out [Here](https://fast.kalman.co.il).
 
 ## Features
 
