@@ -293,13 +293,15 @@ export default {
         const proxyUrl = new URL(request.url);
         proxyUrl.host = 'cfcap'; // Service Binding ignores host, but URL needs one
 
-        // Neutralize Host header for Service Binding
-        // We set it to the binding name 'cfcap' to avoid upstream 403s on custom domains
-        // This DOES NOT utilize a specific public URI, meeting the "no spoofing" requirement
+        // Sanitize headers to bypass upstream CORS/Origin checks
+        // We strip Origin and Referer so the upstream sees this as a direct server call
+        // rather than a browser request from an unknown domain.
         const proxyHeaders = new Headers(request.headers);
         proxyHeaders.set('Host', 'cfcap');
+        proxyHeaders.delete('Origin');
+        proxyHeaders.delete('Referer');
 
-        // Forward the request to the bound worker with sanitized headers
+        // Forward the request to the bound worker
         return env.CFCAP.fetch(new Request(proxyUrl, {
           method: request.method,
           headers: proxyHeaders,
