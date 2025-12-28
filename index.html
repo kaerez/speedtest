@@ -183,16 +183,8 @@ kaerez/speedtest/index.html
             useEffect(() => { dataRef.current = data; }, [data]);
             useEffect(() => { statusRef.current = status; }, [status]);
 
-            useEffect(() => { log('SYSTEM READY'); }, []);
-            const log = (m) => setLogs(p => [...p, `[${getTimestamp()}] > ${m}`]);
-
             useEffect(() => {
-                fetch('/api/meta')
-                    .then(r => r.json())
-                    .then(m => {
-                        setData(d => ({ ...d, meta: m }));
-                    })
-                    .catch(e => { console.error(e); log('ERROR: FAILED TO FETCH METADATA'); });
+                log('SYSTEM READY');
                 setTimeout(() => lucide.createIcons(), 100);
 
                 // CapJS Listener
@@ -212,6 +204,16 @@ kaerez/speedtest/index.html
 
                             if (res.ok) {
                                 log('VERIFICATION SUCCESSFUL');
+
+                                // Fetch Metadata (Now Protected)
+                                try {
+                                    const meta = await fetch('/api/meta').then(r => r.json());
+                                    setData(d => ({ ...d, meta }));
+                                } catch (e) {
+                                    console.error('Meta fetch failed', e);
+                                    log('WARNING: COULD NOT FETCH LOCATION DATA');
+                                }
+
                                 runTest();
                             } else {
                                 log('ERROR: VERIFICATION FAILED');

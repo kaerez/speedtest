@@ -250,6 +250,12 @@ export default {
 
     // 8. API: Metadata
     if (path === '/api/meta') {
+      if (!isAuthorized) {
+        return new Response('Unauthorized', {
+          status: 401,
+          headers: { 'Set-Cookie': `${AUTH_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/` }
+        });
+      }
       const cf = request.cf || {};
 
       return new Response(JSON.stringify({
