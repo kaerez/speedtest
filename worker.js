@@ -54,7 +54,10 @@ export default {
         const capRes = await env.CFCAP.fetch(new Request('https://cfcap/api/validate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token })
+          body: JSON.stringify({
+            token,
+            keepToken: true
+          })
         }));
         if (capRes.ok) {
           // Success: Generate Simple Session Cookie (Timestamp only)
@@ -85,6 +88,22 @@ export default {
 
     // 2. Logout / Session Cleanup
     if (path === '/api/logout' && request.method === 'POST') {
+      try {
+        const body = await request.clone().json().catch(() => ({}));
+        if (body.token) {
+          // Fire and forget (or await if strict) delete call
+          await env.CFCAP.fetch(new Request('https://cfcap/api/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token: body.token
+            })
+          }));
+        }
+      } catch (e) {
+        // Ignore errors during logout
+      }
+
       return new Response('{"success": true}', {
         headers: {
           'Content-Type': 'application/json',

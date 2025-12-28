@@ -176,6 +176,7 @@ kaerez/speedtest/index.html
                 meta: { ip: '---', isp: 'Loading...', country: 'XX', asn: '---', city: '---', region: '', colo: '---' }
             });
             const [logs, setLogs] = useState([]);
+            const tokenRef = useRef(null);
 
             useEffect(() => { log('SYSTEM READY'); }, []);
             const log = (m) => setLogs(p => [...p, `[${getTimestamp()}] > ${m}`]);
@@ -194,6 +195,7 @@ kaerez/speedtest/index.html
                 if (widget) {
                     widget.addEventListener('solve', async (e) => {
                         const token = e.detail.token;
+                        tokenRef.current = token;
                         log('VERIFYING TOKEN...');
 
                         try {
@@ -325,7 +327,11 @@ kaerez/speedtest/index.html
                     log('--------------------------------');
 
                     // CLEANUP SESSION
-                    await fetch('/api/logout', { method: 'POST' });
+                    await fetch('/api/logout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: tokenRef.current ? JSON.stringify({ token: tokenRef.current }) : undefined
+                    });
                     log('SESSION CLOSED');
 
                 } catch (err) {
@@ -337,7 +343,11 @@ kaerez/speedtest/index.html
                     }
                     setStatus('IDLE');
                     // Ensure cleanup on error too
-                    fetch('/api/logout', { method: 'POST' });
+                    fetch('/api/logout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: tokenRef.current ? JSON.stringify({ token: tokenRef.current }) : undefined
+                    });
                 }
             };
 
