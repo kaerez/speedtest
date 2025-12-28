@@ -292,8 +292,20 @@ export default {
       if (!capApiBase && (path.startsWith('/api/challenge') || path.startsWith('/api/sitekey') || path.startsWith('/api/theme') || path.startsWith('/api/lang') || path.startsWith('/api/redeem'))) {
         const proxyUrl = new URL(request.url);
         proxyUrl.host = 'cfcap'; // Service Binding ignores host, but URL needs one
-        // Forward the request to the bound worker
-        return env.CFCAP.fetch(new Request(proxyUrl, request));
+
+        // Neutralize Host header for Service Binding
+        // We set it to the binding name 'cfcap' to avoid upstream 403s on custom domains
+        // This DOES NOT utilize a specific public URI, meeting the "no spoofing" requirement
+        const proxyHeaders = new Headers(request.headers);
+        proxyHeaders.set('Host', 'cfcap');
+
+        // Forward the request to the bound worker with sanitized headers
+        return env.CFCAP.fetch(new Request(proxyUrl, {
+          method: request.method,
+          headers: proxyHeaders,
+          body: request.body,
+          redirect: 'follow'
+        }));
       }
 
       return new Response('Not Found', { status: 404 });
