@@ -152,14 +152,14 @@ export default {
         }
       }
 
-      if (env.SPEEDTEST_REQUIRE_AUTH === 'false') {
+      if (env.SPEEDTEST_REQUIRE_AUTH === false || env.SPEEDTEST_REQUIRE_AUTH === 'false') {
         isAuthorized = true;
       }
 
       // 3. Serve Frontend
       if (path === '/' || path === '/index.html') {
         const config = {
-          requireAuth: env.SPEEDTEST_REQUIRE_AUTH !== 'false',
+          requireAuth: env.SPEEDTEST_REQUIRE_AUTH !== false && env.SPEEDTEST_REQUIRE_AUTH !== 'false',
           captchaApiUrl: (capApiBase || '/api') + '/' // Ensure trailing slash for widget conventions
         };
 

@@ -26,7 +26,7 @@ The application is configured via `wrangler.toml` and Environment Variables.
 | :--- | :--- | :--- |
 | `SPEEDTEST_REQUIRE_AUTH` | Set to `"false"` to disable CapJS verification and allow immediate testing. | `"true"` |
 | `CAPTCHA_API_URL` | Optional full URL to a custom CapJS validation API. If set, Workers proxies challenge/redeem endpoints here. | `undefined` |
-| `ALLOWED_IFRAMES` | Comma-separated list of allowed parent origins or paths (e.g., `a.com,*.b.com,*.c.com/app/*`). | `undefined` (Deny All) |
+| `ALLOWED_IFRAMES` | Comma-separated list of allowed parent domains. Supports wildcards (e.g., `*.example.com`). Supports both quoted and unquoted strings. | `undefined` (Deny All) |
 
 ### Service Bindings
 
@@ -88,13 +88,18 @@ npm run dev
 
 ### External CapJS API (Option B)
 
-If you configure `CAPTCHA_API_URL`, the Speed Test client connects directly to your external CapJS instance.
--   **Client**: Browser sends `/challenge` and `/redeem` requests directly to `CAPTCHA_API_URL`.
--   **Server**: Worker sends `/delete` requests to `CAPTCHA_API_URL/delete` during logout.
--   **Structure**: Set the base URL (e.g., `https://my-cap.example.com/api`).
-    -   The system automatically appends `/challenge`, `/validate`, etc.
+If you are hosting CapJS separately (not using Service Bindings), set the `CAPTCHA_API_URL` environment variable.
 
-**Note**: Ensure your external CapJS instance allows CORS for your Speed Test domain.
+The Worker automatically handles URL normalization:
+*   Input: `https://cap.example.com/api` or `https://cap.example.com/api/`
+*   Backend resolves to: `https://cap.example.com/api/validate`
+*   Frontend resolves to: `https://cap.example.com/api/`
+
+```toml
+# wrangler.toml
+[vars]
+CAPTCHA_API_URL = "https://cap.example.com/api"
+```
 
 ### Iframe Protection
 
