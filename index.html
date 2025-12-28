@@ -183,6 +183,8 @@ kaerez/speedtest/index.html
             useEffect(() => { dataRef.current = data; }, [data]);
             useEffect(() => { statusRef.current = status; }, [status]);
 
+            const log = (m) => setLogs(p => [...p, `[${getTimestamp()}] > ${m}`]);
+
             useEffect(() => {
                 log('SYSTEM READY');
                 setTimeout(() => lucide.createIcons(), 100);
