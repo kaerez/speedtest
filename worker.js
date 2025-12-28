@@ -160,7 +160,7 @@ export default {
       if (path === '/' || path === '/index.html') {
         const config = {
           requireAuth: env.SPEEDTEST_REQUIRE_AUTH !== 'false',
-          captchaApiUrl: capApiBase || '/api' // Fallback to internal proxy if no external URL
+          captchaApiUrl: (capApiBase || '/api') + '/' // Ensure trailing slash for widget conventions
         };
 
         const modifiedHtml = html.replace(
