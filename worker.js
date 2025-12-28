@@ -291,24 +291,29 @@ export default {
       // If no external API is set, proxy client requests to the bound fallback worker
       if (!capApiBase && (path.startsWith('/api/challenge') || path.startsWith('/api/sitekey') || path.startsWith('/api/theme') || path.startsWith('/api/lang') || path.startsWith('/api/redeem'))) {
         const proxyUrl = new URL(request.url);
-        proxyUrl.host = 'cfcap'; // Service Binding ignores host, but URL needs one
+        proxyUrl.host = 'cfcap'; // Service Binding requirement
 
-        // Sanitize headers to bypass upstream CORS/CSRF checks
-        // We align Host, Origin, and Referer to the internal binding name 'cfcap'
-        // This creates a consistent request context for the upstream worker
-        // without spoofing a specific public domain we don't know.
+        // Strategy: Pass-through Host, Stripe Origin/Referer
+        // We let the upstream see the real domain (fast.kalman.co.il)
+        // but remove browser CORS headers to avoid "Unknown Origin" rejection.
         const proxyHeaders = new Headers(request.headers);
-        proxyHeaders.set('Host', 'cfcap');
-        proxyHeaders.set('Origin', 'https://cfcap');
-        proxyHeaders.set('Referer', 'https://cfcap/');
+        proxyHeaders.delete('Origin');
+        proxyHeaders.delete('Referer');
 
-        // Forward the request to the bound worker
-        return env.CFCAP.fetch(new Request(proxyUrl, {
+        // Forward with debug logging
+        const resp = await env.CFCAP.fetch(new Request(proxyUrl, {
           method: request.method,
           headers: proxyHeaders,
           body: request.body,
           redirect: 'follow'
         }));
+
+        if (!resp.ok) {
+          const errText = await resp.clone().text();
+          console.error(`Upstream Proxy Error [${resp.status}]: ${errText.substring(0, 200)}`);
+        }
+
+        return resp;
       }
 
       return new Response('Not Found', { status: 404 });
