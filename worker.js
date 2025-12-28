@@ -44,6 +44,9 @@ export default {
     const path = url.pathname;
     const cookieHeader = request.headers.get('Cookie') || '';
 
+    // Normalize CAPTCHA_API_URL (Option B) - Strip trailing slashes
+    const capApiBase = env.CAPTCHA_API_URL ? env.CAPTCHA_API_URL.replace(/\/+$/, '') : null;
+
     // --- CAPTCHA VALIDATION ---
 
     // 1. Validate CapJS Token
@@ -51,18 +54,27 @@ export default {
       try {
         const { token } = await request.json();
 
-        // Validate with CapJS via Service Binding
-        // Note: Using a dummy internal URL or just path is fine for bindings, 
-        // but explicit full URL is safer for some libraries.
-        // We target the same path /api/validate.
-        const capRes = await env.CFCAP.fetch(new Request('https://cfcap/api/validate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            token,
-            keepToken: true
-          })
-        }));
+        // Validate with CapJS
+        // 1. Check for custom API URL (e.g. external or simplified) (env.CAPTCHA_API_URL)
+        // 2. Fallback to Service Binding (env.CFCAP)
+        let capRes;
+        if (capApiBase) {
+          capRes = await fetch(`${capApiBase}/validate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, keepToken: true })
+          });
+        } else {
+          capRes = await env.CFCAP.fetch(new Request('https://cfcap/api/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token,
+              keepToken: true
+            })
+          }));
+        }
+
         if (capRes.ok) {
           // Success: Generate UUID and store in memory
           const sessionId = crypto.randomUUID();
@@ -106,13 +118,23 @@ export default {
         const body = await request.clone().json().catch(() => ({}));
         if (body.token) {
           // Fire and forget (or await if strict) delete call
-          await env.CFCAP.fetch(new Request('https://cfcap/api/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              token: body.token
-            })
-          }));
+          if (capApiBase) {
+            // Option B: External Delete
+            await fetch(`${capApiBase}/delete`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: body.token })
+            });
+          } else {
+            // Option A: Service Binding
+            await env.CFCAP.fetch(new Request('https://cfcap/api/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                token: body.token
+              })
+            }));
+          }
         }
       } catch (e) {
         // Ignore errors during logout
@@ -147,14 +169,31 @@ export default {
       }
     }
 
+    // Optional Auth Bypass
+    if (env.SPEEDTEST_REQUIRE_AUTH === 'false') {
+      isAuthorized = true;
+    }
+
     // 3. Serve Frontend Structure (Root)
     if (path === '/' || path === '/index.html') {
-      return new Response(html, {
+      // Inject Configuration
+      const config = {
+        requireAuth: env.SPEEDTEST_REQUIRE_AUTH !== 'false',
+        captchaApiUrl: capApiBase // Option B: External API URL (Normalized)
+      };
+
+      const modifiedHtml = html.replace(
+        '<!-- CONFIG_PLACEHOLDER -->',
+        `<script>window.SPEEDTEST_CONFIG = ${JSON.stringify(config)};</script>`
+      );
+
+      return new Response(modifiedHtml, {
         headers: {
           'Content-Type': 'text/html;charset=UTF-8',
           'Cache-Control': 'no-cache',
           ...CORS_HEADERS,
-          ...SECURITY_HEADERS // Added Security Headers
+          ...SECURITY_HEADERS,
+          ...frameHeaders // Apply computed Frame Options / CSP
         },
       });
     }
@@ -246,6 +285,102 @@ export default {
       }), {
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });
+    }
+
+    // --- IFRAME PROTECTION ---
+    // Dynamic CSP/Frame-Options based on ALLOWED_IFRAMES
+
+    let frameHeaders = {
+      'X-Frame-Options': 'DENY',
+      'Content-Security-Policy': "frame-ancestors 'none'"
+    };
+
+    if (env.ALLOWED_IFRAMES) {
+      const referer = request.headers.get('Referer');
+      if (referer) {
+        try {
+          const refUrl = new URL(referer);
+          const refString = refUrl.host + refUrl.pathname; // host/path
+
+          const allowedList = env.ALLOWED_IFRAMES.split(',').map(s => s.trim().replace(/^["']|["']$/g, ''));
+
+          let matched = false;
+          for (const rule of allowedList) {
+            // Convert rule to regex
+            // Escape special chars except *
+            // *.a.com -> .*\.a\.com
+            const regexBody = rule.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+            const regex = new RegExp(`^${regexBody}$`); // Match entire string? Or part?
+            // User examples:
+            // "a.com" -> host must be a.com (exact?) 
+            // "*.a.com" -> host ends with .a.com
+            // "*.a.com/c/*" -> host+path match
+
+            // To handle both simple host match and path match:
+            // If rule has no '/', match against host only? 
+            // Or always match against host+path?
+            // "a.com" matches "a.com" and "a.com/"
+
+            if (regex.test(refUrl.host) || regex.test(refString)) {
+              matched = true;
+              break;
+            }
+          }
+
+          if (matched) {
+            frameHeaders = {
+              'X-Frame-Options': `ALLOW-FROM ${refUrl.origin}`,
+              'Content-Security-Policy': `frame-ancestors ${refUrl.origin}`
+            };
+          }
+        } catch (e) {
+          // Invalid referer URL, block
+        }
+      }
+    }
+
+    // --- PROXY ENDPOINTS (Option B) ---
+    // Only if CAPTCHA_API_URL is set
+
+    if (env.CAPTCHA_API_URL) {
+      // Prepare base URL (strip trailing slash)
+      const baseUrl = env.CAPTCHA_API_URL.replace(/\/$/, '');
+      const proxyHeaders = { ...CORS_HEADERS, 'Content-Type': 'application/json' };
+
+      // Proxy /api/challenge
+      if (path === '/api/challenge') {
+        const upstream = `${baseUrl}/challenge${url.search}`;
+        const proxied = await fetch(upstream, {
+          method: request.method,
+          headers: request.headers
+        });
+        // Rewrite headers if needed? usually fine.
+        return proxied;
+      }
+
+      // Proxy /api/redeem (or validate)
+      if (path === '/api/redeem') {
+        const upstream = `${baseUrl}/redeem`;
+        const proxied = await fetch(upstream, {
+          method: request.method,
+          headers: request.headers,
+          body: request.body
+        });
+        return proxied;
+      }
+
+      // Proxy /api/delete
+      if (path === '/api/delete') {
+        const upstream = `${baseUrl}/delete`;
+        // Fire and forget? Or wait? 
+        // Ideally wait since client might expect 200
+        const proxied = await fetch(upstream, {
+          method: request.method,
+          headers: request.headers,
+          body: request.body
+        });
+        return proxied;
+      }
     }
 
     // 8. API: Metadata

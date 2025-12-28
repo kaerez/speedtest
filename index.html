@@ -24,9 +24,10 @@ kaerez/speedtest/index.html
     <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- CONFIG_PLACEHOLDER -->
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@cap.js/widget@0.1.33/cap.min.js"></script>
 
     <link
@@ -170,6 +171,10 @@ kaerez/speedtest/index.html
 
         // --- Main Application ---
         const App = () => {
+            // Read config (default to true if missing)
+            const requireAuth = window.SPEEDTEST_CONFIG?.requireAuth ?? true;
+            const captchaApiUrl = window.SPEEDTEST_CONFIG?.captchaApiUrl;
+
             const [status, setStatus] = useState('IDLE');
             const [data, setData] = useState({
                 ping: 0, jitter: 0, loss: 0, down: 0, up: 0,
@@ -189,58 +194,66 @@ kaerez/speedtest/index.html
                 log('SYSTEM READY');
                 setTimeout(() => lucide.createIcons(), 100);
 
-                // CapJS Listener
-                const widget = document.getElementById('cap-widget');
-                if (widget) {
-                    widget.addEventListener('solve', async (e) => {
-                        const token = e.detail.token;
-                        tokenRef.current = token;
-                        log('VERIFYING TOKEN...');
+                if (requireAuth) {
+                    // CapJS Listener
+                    const widget = document.getElementById('cap-widget');
+                    if (widget) {
+                        widget.addEventListener('solve', async (e) => {
+                            const token = e.detail.token;
+                            tokenRef.current = token;
+                            log('VERIFYING TOKEN...');
 
-                        try {
-                            const res = await fetch('/api/verify', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ token })
-                            });
+                            try {
+                                const res = await fetch('/api/verify', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ token })
+                                });
 
-                            if (res.ok) {
-                                log('VERIFICATION SUCCESSFUL');
+                                if (res.ok) {
+                                    log('VERIFICATION SUCCESSFUL');
 
-                                // Fetch Metadata (Now Protected)
-                                try {
-                                    const meta = await fetch('/api/meta').then(r => r.json());
-                                    setData(d => ({ ...d, meta }));
-                                } catch (e) {
-                                    console.error('Meta fetch failed', e);
-                                    log('WARNING: COULD NOT FETCH LOCATION DATA');
+                                    // Fetch Metadata (Now Protected)
+                                    try {
+                                        const meta = await fetch('/api/meta').then(r => r.json());
+                                        setData(d => ({ ...d, meta }));
+                                    } catch (e) {
+                                        console.error('Meta fetch failed', e);
+                                        log('WARNING: COULD NOT FETCH LOCATION DATA');
+                                    }
+
+                                    runTest();
+                                } else {
+                                    log('ERROR: VERIFICATION FAILED');
+                                    setStatus('IDLE');
                                 }
-
-                                runTest();
-                            } else {
-                                log('ERROR: VERIFICATION FAILED');
+                            } catch (err) {
+                                console.error(err);
+                                log('ERROR: VERIFICATION ERROR');
                                 setStatus('IDLE');
                             }
-                        } catch (err) {
-                            console.error(err);
-                            log('ERROR: VERIFICATION ERROR');
-                            setStatus('IDLE');
-                        }
-                    });
-                }
-
-                // Inject floating script dynamically to handle React render timing
-                const script = document.createElement('script');
-                script.src = "https://cdn.jsdelivr.net/npm/@cap.js/widget@0.1.33/cap-floating.min.js";
-                script.async = true;
-                document.body.appendChild(script);
-
-                return () => {
-                    if (document.body.contains(script)) {
-                        document.body.removeChild(script);
+                        });
                     }
-                };
-            }, []);
+
+                    // Inject floating script dynamically to handle React render timing
+                    const script = document.createElement('script');
+                    script.src = "https://cdn.jsdelivr.net/npm/@cap.js/widget@0.1.33/cap-floating.min.js";
+                    script.async = true;
+                    document.body.appendChild(script);
+
+                    return () => {
+                        if (document.body.contains(script)) {
+                            document.body.removeChild(script);
+                        }
+                    };
+                } else {
+                    // If Auth is NOT required, fetch metadata immediately (as backend Bypass is presumably on)
+                    fetch('/api/meta')
+                        .then(r => r.json())
+                        .then(m => setData(d => ({ ...d, meta: m })))
+                        .catch(e => { console.error('Meta fetch failed', e); });
+                }
+            }, [requireAuth]);
 
             // Helper to determine best location string
             const getLocationDisplay = (meta) => {
@@ -429,26 +442,44 @@ kaerez/speedtest/index.html
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mb-8">
                         <div className="flex justify-center md:col-span-1">
-                            <cap-widget
-                                id="cap-widget"
-                                data-cap-api-endpoint="https://cfcap.secops.workers.dev/api/"
-                                style={{ display: 'none' }} // Hidden initally, managed by floating lib
-                            ></cap-widget>
+                            {requireAuth ? (
+                                <>
+                                    <cap-widget
+                                        id="cap-widget"
+                                        theme="light"
+                                        style={{ display: 'none' }}
+                                        data-cap-api-endpoint={captchaApiUrl} // Optional: External API
+                                    ></cap-widget>
 
-                            <button
-                                id="start-btn"
-                                data-cap-floating="#cap-widget"
-                                data-cap-floating-position="bottom"
-                                disabled={status === 'RUNNING'}
-                                className={`
-                                    w-full tech-border py-4 font-bold tracking-widest uppercase transition-all duration-300 rounded-sm
-                                    ${status === 'RUNNING'
-                                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                        : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg hover:shadow-emerald-200'}
-                                `}
-                            >
-                                {status === 'RUNNING' ? 'Running Analysis...' : 'Start Test'}
-                            </button>
+                                    <button
+                                        id="start-btn"
+                                        data-cap-floating="#cap-widget"
+                                        data-cap-floating-position="bottom"
+                                        disabled={status === 'RUNNING'}
+                                        className={`
+                                            w-full tech-border py-4 font-bold tracking-widest uppercase transition-all duration-300 rounded-sm
+                                            ${status === 'RUNNING'
+                                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg hover:shadow-emerald-200'}
+                                        `}
+                                    >
+                                        {status === 'RUNNING' ? 'Running Analysis...' : 'Start Test'}
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={runTest}
+                                    disabled={status === 'RUNNING'}
+                                    className={`
+                                        w-full tech-border py-4 font-bold tracking-widest uppercase transition-all duration-300 rounded-sm
+                                        ${status === 'RUNNING'
+                                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                            : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg hover:shadow-emerald-200'}
+                                    `}
+                                >
+                                    {status === 'RUNNING' ? 'Running Analysis...' : 'Start Test'}
+                                </button>
+                            )}
                         </div>
 
                         <div className="md:col-span-2 tech-border bg-slate-50 p-3 font-mono text-xs flex flex-col justify-end h-48 rounded-sm border-slate-200 overflow-hidden">
