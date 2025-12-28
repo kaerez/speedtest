@@ -51,7 +51,7 @@ export default {
         // Validate with CapJS
         const capRes = await fetch(CAPTCHA_VALIDATE_API, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', "Origin": "https://speedtest.secops.workers.dev" },
           body: JSON.stringify({ token })
         });
         if (capRes.ok) {
